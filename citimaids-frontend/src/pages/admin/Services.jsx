@@ -69,8 +69,8 @@ export default function Services() {
     const [formLoading, setFormLoading] = useState(false);
     const [reorderMode, setReorderMode] = useState(false);
     const [reordering, setReordering] = useState(false);
-    const [draggingIndex, setDraggingIndex] = useState(null);
-    const [dragOverIndex, setDragOverIndex] = useState(null);
+    const [dragState, setDragState] = useState(null);
+    const dragRef = useRef(null);
 
     useEffect(() => { fetchServices(); }, []);
 
@@ -167,64 +167,90 @@ export default function Services() {
         }
     };
 
-    // ── Smooth Drag & Drop Reordering ─────────────────────────────────
-    const handleDragStart = (e, index) => {
-        setDraggingIndex(index);
-        setDragOverIndex(index);
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', String(index));
+    // ── Smooth Pointer-based Drag & Drop (No HTML5 Ghost, No Glitching) ──
+    const handlePointerDown = (e, index) => {
+        if (!reorderMode) return;
+        const rowEl = e.currentTarget.closest('[data-service-row]');
+        const rowHeight = rowEl ? rowEl.getBoundingClientRect().height : 58;
+
+        const state = {
+            activeIndex: index,
+            startY: e.clientY,
+            offsetY: 0,
+            targetIndex: index,
+            rowHeight,
+            maxIndex: sortedServices.length - 1,
+        };
+        dragRef.current = state;
+        setDragState(state);
     };
 
-    const handleDragEnter = (e, index) => {
-        e.preventDefault();
-        if (draggingIndex !== null && dragOverIndex !== index) {
-            setDragOverIndex(index);
-        }
-    };
+    useEffect(() => {
+        if (!dragState) return;
 
-    const handleDragOver = (e, index) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        if (draggingIndex !== null && dragOverIndex !== index) {
-            setDragOverIndex(index);
-        }
-    };
+        const onPointerMove = (e) => {
+            const current = dragRef.current;
+            if (!current) return;
+            const deltaY = e.clientY - current.startY;
+            const indexDiff = Math.round(deltaY / current.rowHeight);
+            const targetIndex = Math.max(0, Math.min(current.maxIndex, current.activeIndex + indexDiff));
 
-    const handleDragEnd = async () => {
-        const from = draggingIndex;
-        const to = dragOverIndex;
-        setDraggingIndex(null);
-        setDragOverIndex(null);
+            const updated = {
+                ...current,
+                offsetY: deltaY,
+                targetIndex,
+            };
+            dragRef.current = updated;
+            setDragState(updated);
+        };
 
-        if (from !== null && to !== null && from !== to) {
-            const reordered = [...sortedServices];
-            const [moved] = reordered.splice(from, 1);
-            reordered.splice(to, 0, moved);
-            // Re-assign display_order sequentially so sortedServices updates immediately without refresh
-            const withNewOrders = reordered.map((item, idx) => ({
-                ...item,
-                display_order: idx + 1,
-            }));
-            setServices(withNewOrders);
-            await persistReorder(withNewOrders);
-        }
-    };
+        const onPointerUp = async () => {
+            const current = dragRef.current;
+            dragRef.current = null;
+            setDragState(null);
+
+            if (current && current.activeIndex !== current.targetIndex) {
+                const from = current.activeIndex;
+                const to = current.targetIndex;
+                const reordered = [...sortedServices];
+                const [moved] = reordered.splice(from, 1);
+                reordered.splice(to, 0, moved);
+                const withNewOrders = reordered.map((item, idx) => ({
+                    ...item,
+                    display_order: idx + 1,
+                }));
+                setServices(withNewOrders);
+                await persistReorder(withNewOrders);
+            }
+        };
+
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+        return () => {
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+        };
+    }, [dragState, sortedServices]);
 
     const getRowTransform = (index) => {
-        if (draggingIndex === null || dragOverIndex === null || draggingIndex === dragOverIndex) {
+        if (!dragState) return 'translateY(0px)';
+        const { activeIndex, targetIndex, rowHeight, offsetY } = dragState;
+
+        if (index === activeIndex) {
+            return `translateY(${offsetY}px)`;
+        }
+        if (activeIndex === targetIndex) {
             return 'translateY(0px)';
         }
-        if (index === draggingIndex) {
-            const offset = (dragOverIndex - draggingIndex) * 100;
-            return `translateY(${offset}%)`;
-        }
-        if (draggingIndex < dragOverIndex) {
-            if (index > draggingIndex && index <= dragOverIndex) {
-                return 'translateY(-100%)';
+        if (activeIndex < targetIndex) {
+            // Dragging down: rows between activeIndex and targetIndex shift UP
+            if (index > activeIndex && index <= targetIndex) {
+                return `translateY(-${rowHeight}px)`;
             }
-        } else if (draggingIndex > dragOverIndex) {
-            if (index >= dragOverIndex && index < draggingIndex) {
-                return 'translateY(100%)';
+        } else if (activeIndex > targetIndex) {
+            // Dragging up: rows between targetIndex and activeIndex shift DOWN
+            if (index >= targetIndex && index < activeIndex) {
+                return `translateY(${rowHeight}px)`;
             }
         }
         return 'translateY(0px)';
@@ -683,12 +709,9 @@ export default function Services() {
                                     svc={svc}
                                     index={index}
                                     reorderMode={reorderMode}
-                                    isDragging={draggingIndex === index}
+                                    isDragging={dragState?.activeIndex === index}
                                     transform={getRowTransform(index)}
-                                    onDragStart={(e) => handleDragStart(e, index)}
-                                    onDragEnter={(e) => handleDragEnter(e, index)}
-                                    onDragOver={(e) => handleDragOver(e, index)}
-                                    onDragEnd={handleDragEnd}
+                                    onPointerDown={(e) => handlePointerDown(e, index)}
                                     onView={() => setViewModal(svc)}
                                     onEdit={() => openEdit(svc)}
                                     onDelete={() => setDeleteModal(svc)}
@@ -717,12 +740,9 @@ export default function Services() {
                                             svc={svc}
                                             index={actualIndex}
                                             reorderMode={reorderMode}
-                                            isDragging={draggingIndex === actualIndex}
+                                            isDragging={dragState?.activeIndex === actualIndex}
                                             transform={getRowTransform(actualIndex)}
-                                            onDragStart={(e) => handleDragStart(e, actualIndex)}
-                                            onDragEnter={(e) => handleDragEnter(e, actualIndex)}
-                                            onDragOver={(e) => handleDragOver(e, actualIndex)}
-                                            onDragEnd={handleDragEnd}
+                                            onPointerDown={(e) => handlePointerDown(e, actualIndex)}
                                             onView={() => setViewModal(svc)}
                                             onEdit={() => openEdit(svc)}
                                             onDelete={() => setDeleteModal(svc)}
@@ -752,19 +772,20 @@ export default function Services() {
 function ServiceRow({
     svc, index, reorderMode,
     isDragging, transform,
-    onDragStart, onDragEnter, onDragOver, onDragEnd,
+    onPointerDown,
     onView, onEdit, onDelete, onToggle,
 }) {
     const isActive = svc.status === 'active';
 
     return (
         <div
-            draggable={reorderMode}
-            onDragStart={onDragStart}
-            onDragEnter={onDragEnter}
-            onDragOver={onDragOver}
-            onDragEnd={onDragEnd}
+            data-service-row
             onClick={() => !reorderMode && onView()}
+            onPointerDown={(e) => {
+                if (reorderMode && !e.target.closest('button')) {
+                    onPointerDown(e);
+                }
+            }}
             style={{
                 ...tdRow,
                 gridTemplateColumns: reorderMode
@@ -772,19 +793,20 @@ function ServiceRow({
                     : '1.8fr 130px 110px 105px 92px',
                 cursor: reorderMode ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
                 userSelect: reorderMode ? 'none' : 'auto',
+                touchAction: reorderMode ? 'none' : 'auto',
                 background: isDragging
                     ? '#ffffff'
                     : (!isActive ? '#fafbfc' : '#fff'),
                 opacity: 1,
                 border: isDragging ? '1.5px solid #2563eb' : undefined,
-                boxShadow: isDragging ? '0 10px 28px rgba(10,35,66,0.18)' : 'none',
+                boxShadow: isDragging ? '0 12px 32px rgba(10,35,66,0.20)' : 'none',
                 borderRadius: isDragging ? 10 : 0,
                 transform: reorderMode ? transform : 'none',
-                transition: reorderMode
-                    ? 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background 0.15s, box-shadow 0.15s'
-                    : 'background 0.15s',
+                transition: isDragging
+                    ? 'none'
+                    : (reorderMode ? 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background 0.15s' : 'background 0.15s'),
                 position: 'relative',
-                zIndex: isDragging ? 10 : 1,
+                zIndex: isDragging ? 50 : 1,
                 boxSizing: 'border-box',
             }}
             onMouseEnter={e => {
@@ -796,7 +818,15 @@ function ServiceRow({
         >
             {/* Reorder drag handle */}
             {reorderMode && (
-                <div style={{ color: isDragging ? '#0284c7' : '#94a3b8', fontSize: 16, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }} title="Drag to reorder">
+                <div
+                    style={{
+                        color: isDragging ? '#0284c7' : '#94a3b8',
+                        fontSize: 16,
+                        cursor: isDragging ? 'grabbing' : 'grab',
+                        userSelect: 'none',
+                    }}
+                    title="Drag to reorder"
+                >
                     ⠿
                 </div>
             )}
