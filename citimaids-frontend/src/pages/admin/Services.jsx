@@ -2,27 +2,28 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import api from '../../api/axios';
 import { brand, fonts, pageTitle, pageSubtitle, card, solidBtn as solidBtnToken, outlineBtn as outlineBtnToken, inputStyle as inputStyleToken, selectStyle as selectStyleToken } from './adminStyles';
 
-/* Minimal, understated category configuration (clean neutral pill with subtle colored accent dot) */
+/* Category config: dot color for pills, and soft avatar bg/text tint */
 const CATEGORY_CONFIG = {
-    residential: { label: 'Residential', dot: '#059669' },
-    commercial:  { label: 'Commercial', dot: '#2563eb' },
-    specialized: { label: 'Specialized', dot: '#7c3aed' },
-    maintenance: { label: 'Maintenance', dot: '#d97706' },
+    residential: { label: 'Residential', dot: '#059669', avatarBg: '#ecfdf5', avatarColor: '#065f46' },
+    commercial:  { label: 'Commercial',  dot: '#2563eb', avatarBg: '#eff6ff', avatarColor: '#1e40af' },
+    specialized: { label: 'Specialized', dot: '#7c3aed', avatarBg: '#f5f3ff', avatarColor: '#5b21b6' },
+    maintenance: { label: 'Maintenance', dot: '#d97706', avatarBg: '#fffbeb', avatarColor: '#92400e' },
 };
 
-/* Minimal, clean service letter avatar */
-function ServiceLetterAvatar({ name, status = 'active', size = 38 }) {
+/* Letter avatar tinted to the service's category */
+function ServiceLetterAvatar({ name, category, status = 'active', size = 36 }) {
     const letter = (name || 'S').trim().charAt(0).toUpperCase();
     const isActive = status === 'active';
+    const cat = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.residential;
     return (
         <div style={{
-            width: size, height: size, borderRadius: 10,
-            background: isActive ? '#f1f5f9' : '#f8fafc',
-            color: isActive ? '#0A2342' : '#94a3b8',
+            width: size, height: size, borderRadius: 9,
+            background: isActive ? cat.avatarBg : '#f1f5f9',
+            color: isActive ? cat.avatarColor : '#94a3b8',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 800, fontSize: Math.round(size * 0.44),
+            fontWeight: 800, fontSize: Math.round(size * 0.42),
             fontFamily: "'Plus Jakarta Sans', sans-serif",
-            border: `1.5px solid ${isActive ? '#e2e8f0' : '#e2e8f0'}`,
+            border: `1.5px solid ${isActive ? cat.avatarBg : '#e2e8f0'}`,
             flexShrink: 0,
         }}>
             {letter}
@@ -30,16 +31,17 @@ function ServiceLetterAvatar({ name, status = 'active', size = 38 }) {
     );
 }
 
-/* Minimal Category Pill with small accent dot */
+/* Subtle category pill with colored dot */
 function CategoryPill({ category }) {
     const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.residential;
     return (
         <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 6,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
             background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0',
+            whiteSpace: 'nowrap',
         }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: config.dot }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: config.dot, flexShrink: 0 }} />
             {config.label}
         </span>
     );
@@ -233,124 +235,123 @@ export default function Services() {
                 </div>
             )}
 
-            {/* View Modal — Rich Details & Customer Preview Drawer */}
-            {viewModal && (
-                <Overlay onClose={() => setViewModal(null)} title="Service Details">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                        {/* Service Header */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                            <ServiceLetterAvatar name={viewModal.name} status={viewModal.status} size={48} />
-                            <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 18, fontWeight: 800, color: brand.navy }}>{viewModal.name}</div>
-                                <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
-                                    <CategoryPill category={viewModal.category} />
-                                    <span style={{
-                                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
-                                        background: viewModal.status === 'active' ? '#f0fdf4' : '#f8fafc',
-                                        color: viewModal.status === 'active' ? '#166534' : '#64748b',
-                                        border: `1px solid ${viewModal.status === 'active' ? '#dcfce7' : '#e2e8f0'}`,
-                                        display: 'inline-flex', alignItems: 'center', gap: 5,
-                                    }}>
-                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: viewModal.status === 'active' ? '#16a34a' : '#94a3b8' }} />
-                                        {viewModal.status === 'active' ? 'Active on Booking' : 'Inactive (Hidden)'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
+            {/* View Modal — clean, non-redundant service detail sheet */}
+            {viewModal && (() => {
+                const cat = CATEGORY_CONFIG[viewModal.category] || CATEGORY_CONFIG.residential;
+                const isActive = viewModal.status === 'active';
+                return (
+                    <Overlay onClose={() => setViewModal(null)} noHeader>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
 
-                        {/* Customer Live Preview Box */}
-                        <div>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                                </svg>
-                                <span>Customer Booking View Preview</span>
-                            </div>
+                            {/* Colored header band */}
                             <div style={{
-                                padding: '14px 16px', borderRadius: 14,
-                                border: '1.5px solid #e2e8f0', background: '#fff',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                                background: cat.avatarBg,
+                                borderRadius: '12px 12px 0 0',
+                                padding: '18px 20px 16px',
+                                marginBottom: 0,
+                                display: 'flex', alignItems: 'center', gap: 14,
                             }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                    <CategoryPill category={viewModal.category} />
-                                    <div style={{
-                                        width: 18, height: 18, borderRadius: '50%',
-                                        border: '5px solid #0A2342', background: '#fff',
-                                        boxSizing: 'border-box',
-                                    }} />
+                                <div style={{
+                                    width: 48, height: 48, borderRadius: 12,
+                                    background: '#fff', color: cat.avatarColor,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontWeight: 800, fontSize: 20,
+                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                                    flexShrink: 0,
+                                }}>
+                                    {(viewModal.name || 'S').trim().charAt(0).toUpperCase()}
                                 </div>
-                                <div style={{ fontSize: 14, fontWeight: 800, color: brand.navy, marginBottom: 4 }}>
-                                    {viewModal.name}
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 17, fontWeight: 800, color: brand.navy, lineHeight: 1.2 }}>{viewModal.name}</div>
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <CategoryPill category={viewModal.category} />
+                                        <span style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                                            fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
+                                            background: isActive ? '#dcfce7' : '#f1f5f9',
+                                            color: isActive ? '#166534' : '#64748b',
+                                        }}>
+                                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: isActive ? '#16a34a' : '#94a3b8' }} />
+                                            {isActive ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginBottom: 10 }}>
-                                    {viewModal.description || 'Complete professional residential cleaning tailored to your residence.'}
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
-                                    <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Starting Rate</span>
-                                    <span style={{ fontSize: 13, fontWeight: 800, color: brand.navy }}>AED {Number(viewModal.base_price || 0).toFixed(2)}</span>
-                                </div>
+                                <button type="button" onClick={() => setViewModal(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 18, padding: 4, alignSelf: 'flex-start' }}>✕</button>
                             </div>
-                        </div>
 
-                        {/* Specs & Operational Numbers */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                            <div style={{ padding: '10px 12px', borderRadius: 10, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Starting Rate</div>
-                                <div style={{ fontSize: 15, fontWeight: 800, color: brand.navy, marginTop: 2 }}>AED {Number(viewModal.base_price || 0).toFixed(2)}</div>
-                            </div>
-                            <div style={{ padding: '10px 12px', borderRadius: 10, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Booking Slot</div>
-                                <div style={{ fontSize: 15, fontWeight: 800, color: brand.navy, marginTop: 2 }}>#{viewModal.display_order || '—'}</div>
-                            </div>
-                            <div style={{ padding: '10px 12px', borderRadius: 10, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Bookings Count</div>
-                                <div style={{ fontSize: 15, fontWeight: 800, color: brand.navy, marginTop: 2 }}>{viewModal.bookings_count || 0}</div>
-                            </div>
-                        </div>
+                            {/* Body */}
+                            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                        {/* Action buttons */}
-                        <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                            <HoverBtn
-                                onClick={() => {
-                                    const target = viewModal;
-                                    setViewModal(null);
-                                    openEdit(target);
-                                }}
-                                base={{ ...outlineBtnToken, flex: 1, justifyContent: 'center' }}
-                                hoverStyle={{ background: '#f1f5f9', borderColor: '#cbd5e1', color: brand.navy, transform: 'translateY(-1px)' }}
-                            >
-                                Edit Service
-                            </HoverBtn>
-                            <HoverBtn
-                                onClick={() => {
-                                    handleToggle(viewModal);
-                                    setViewModal(null);
-                                }}
-                                base={{
-                                    ...outlineBtnToken,
-                                    flex: 1,
-                                    justifyContent: 'center',
-                                    borderColor: viewModal.status === 'active' ? '#fca5a5' : '#cbd5e1',
-                                    color: viewModal.status === 'active' ? '#dc2626' : brand.navy,
-                                }}
-                                hoverStyle={{
-                                    background: viewModal.status === 'active' ? '#fef2f2' : '#f8fafc',
-                                    transform: 'translateY(-1px)'
-                                }}
-                            >
-                                {viewModal.status === 'active' ? 'Deactivate' : 'Activate'}
-                            </HoverBtn>
-                            <HoverBtn
-                                onClick={() => setViewModal(null)}
-                                base={{ ...solidBtnToken, flex: 1, justifyContent: 'center' }}
-                                hoverStyle={{ opacity: 0.88, transform: 'translateY(-1px)', boxShadow: '0 6px 18px rgba(10,35,66,0.3)' }}
-                            >
-                                Close
-                            </HoverBtn>
+                                {/* 3 quick stats */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                                    {[
+                                        { label: 'Starting Rate', value: `AED ${Number(viewModal.base_price || 0).toFixed(2)}` },
+                                        { label: 'Display Order', value: `#${viewModal.display_order || '—'}` },
+                                        { label: 'Bookings', value: viewModal.bookings_count || 0 },
+                                    ].map(({ label, value }) => (
+                                        <div key={label} style={{ padding: '10px 12px', borderRadius: 10, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
+                                            <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+                                            <div style={{ fontSize: 14, fontWeight: 800, color: brand.navy, marginTop: 3 }}>{value}</div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Description */}
+                                {viewModal.description && (
+                                    <div>
+                                        <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Description</div>
+                                        <p style={{ fontSize: 13, color: '#334155', lineHeight: 1.7, margin: 0 }}>
+                                            {viewModal.description}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Visibility note */}
+                                <div style={{
+                                    fontSize: 12, color: isActive ? '#166534' : '#64748b',
+                                    background: isActive ? '#f0fdf4' : '#f8fafc',
+                                    border: `1px solid ${isActive ? '#dcfce7' : '#e2e8f0'}`,
+                                    borderRadius: 8, padding: '8px 12px',
+                                }}>
+                                    {isActive
+                                        ? '✓ Visible on the customer booking page'
+                                        : '• Hidden from customers — activate to make it bookable'}
+                                </div>
+
+                                {/* Actions */}
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <HoverBtn
+                                        onClick={() => { const t = viewModal; setViewModal(null); openEdit(t); }}
+                                        base={{ ...outlineBtnToken, flex: 1, justifyContent: 'center' }}
+                                        hoverStyle={{ background: '#f1f5f9', borderColor: '#cbd5e1', color: brand.navy, transform: 'translateY(-1px)' }}
+                                    >
+                                        Edit
+                                    </HoverBtn>
+                                    <HoverBtn
+                                        onClick={() => { handleToggle(viewModal); setViewModal(null); }}
+                                        base={{
+                                            ...outlineBtnToken, flex: 1, justifyContent: 'center',
+                                            borderColor: isActive ? '#fca5a5' : '#cbd5e1',
+                                            color: isActive ? '#dc2626' : brand.navy,
+                                        }}
+                                        hoverStyle={{ background: isActive ? '#fef2f2' : '#f8fafc', transform: 'translateY(-1px)' }}
+                                    >
+                                        {isActive ? 'Deactivate' : 'Activate'}
+                                    </HoverBtn>
+                                    <HoverBtn
+                                        onClick={() => setViewModal(null)}
+                                        base={{ ...solidBtnToken, flex: 1, justifyContent: 'center' }}
+                                        hoverStyle={{ opacity: 0.88, transform: 'translateY(-1px)', boxShadow: '0 6px 18px rgba(10,35,66,0.3)' }}
+                                    >
+                                        Close
+                                    </HoverBtn>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </Overlay>
-            )}
+                    </Overlay>
+                );
+            })()}
 
             {/* Delete Modal */}
             {deleteModal && (
@@ -542,8 +543,8 @@ export default function Services() {
                 <div style={{
                     ...thRow,
                     gridTemplateColumns: reorderMode
-                        ? '30px 2.6fr 150px 130px 120px 96px'
-                        : '2.6fr 150px 130px 120px 96px',
+                        ? '28px 1.8fr 130px 110px 105px 92px'
+                        : '1.8fr 130px 110px 105px 92px',
                 }}>
                     {reorderMode && <span />}
                     <Th>SERVICE</Th>
@@ -657,8 +658,8 @@ function ServiceRow({
             style={{
                 ...tdRow,
                 gridTemplateColumns: reorderMode
-                    ? '30px 2.6fr 150px 130px 120px 96px'
-                    : '2.6fr 150px 130px 120px 96px',
+                    ? '28px 1.8fr 130px 110px 105px 92px'
+                    : '1.8fr 130px 110px 105px 92px',
                 cursor: reorderMode ? 'grab' : 'pointer',
                 userSelect: reorderMode ? 'none' : 'auto',
                 background: !isActive ? '#fafbfc' : '#fff',
@@ -676,7 +677,7 @@ function ServiceRow({
 
             {/* Service Avatar + Name */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <ServiceLetterAvatar name={svc.name} status={svc.status} size={36} />
+                <ServiceLetterAvatar name={svc.name} category={svc.category} status={svc.status} size={36} />
                 <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>{svc.name}</div>
                     <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
@@ -765,16 +766,20 @@ function MinimalStatCard({ label, value }) {
     );
 }
 
-function Overlay({ children, onClose, title }) {
+function Overlay({ children, onClose, title, noHeader }) {
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(6,20,41,0.5)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={e => e.target === e.currentTarget && onClose()}>
-            <div style={{ background: '#fff', borderRadius: 18, padding: 26, width: 460, maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(10,35,66,0.18)', position: 'relative' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: title ? 16 : 0 }}>
-                    {title && <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: brand.navy, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</h3>}
-                    <button type="button" onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 16, padding: 4, lineHeight: 1 }}>✕</button>
+            <div style={{ background: '#fff', borderRadius: 18, width: 460, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 50px rgba(10,35,66,0.18)', overflow: 'hidden' }}>
+                {!noHeader && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px 0', marginBottom: title ? 14 : 0, flexShrink: 0 }}>
+                        {title && <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: brand.navy, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</h3>}
+                        <button type="button" onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 16, padding: 4, lineHeight: 1, marginLeft: 'auto' }}>✕</button>
+                    </div>
+                )}
+                <div style={{ overflowY: 'auto', ...(noHeader ? {} : { padding: '0 24px 24px' }) }}>
+                    {children}
                 </div>
-                {children}
             </div>
         </div>
     );
