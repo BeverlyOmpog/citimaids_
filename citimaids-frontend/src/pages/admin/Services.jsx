@@ -1,31 +1,47 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import api from '../../api/axios';
-import { brand, fonts, pageTitle, pageSubtitle, card, solidBtn as solidBtnToken, outlineBtn as outlineBtnToken, statusBadge, inputStyle as inputStyleToken, selectStyle as selectStyleToken } from './adminStyles';
+import { brand, fonts, pageTitle, pageSubtitle, card, solidBtn as solidBtnToken, outlineBtn as outlineBtnToken, inputStyle as inputStyleToken, selectStyle as selectStyleToken } from './adminStyles';
 
+/* Minimal, understated category configuration (clean neutral pill with subtle colored accent dot) */
 const CATEGORY_CONFIG = {
-    residential: { label: 'Residential', color: '#047857', bg: '#f0fdf4', border: '#bbf7d0' },
-    commercial:  { label: 'Commercial', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-    specialized: { label: 'Specialized', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
-    maintenance: { label: 'Maintenance', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+    residential: { label: 'Residential', dot: '#059669' },
+    commercial:  { label: 'Commercial', dot: '#2563eb' },
+    specialized: { label: 'Specialized', dot: '#7c3aed' },
+    maintenance: { label: 'Maintenance', dot: '#d97706' },
 };
 
-/* Minimal, elegant service letter avatar */
+/* Minimal, clean service letter avatar */
 function ServiceLetterAvatar({ name, status = 'active', size = 38 }) {
     const letter = (name || 'S').trim().charAt(0).toUpperCase();
     const isActive = status === 'active';
     return (
         <div style={{
             width: size, height: size, borderRadius: 10,
-            background: isActive ? '#f0f4f8' : '#f8fafc',
+            background: isActive ? '#f1f5f9' : '#f8fafc',
             color: isActive ? '#0A2342' : '#94a3b8',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 800, fontSize: Math.round(size * 0.44),
             fontFamily: "'Plus Jakarta Sans', sans-serif",
-            border: `1.5px solid ${isActive ? '#dbe2ea' : '#e2e8f0'}`,
+            border: `1.5px solid ${isActive ? '#e2e8f0' : '#e2e8f0'}`,
             flexShrink: 0,
         }}>
             {letter}
         </div>
+    );
+}
+
+/* Minimal Category Pill with small accent dot */
+function CategoryPill({ category }) {
+    const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.residential;
+    return (
+        <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 6,
+            background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0',
+        }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: config.dot }} />
+            {config.label}
+        </span>
     );
 }
 
@@ -59,7 +75,7 @@ export default function Services() {
         }
     };
 
-    // Sort services so active ones are on top (ordered by display_order) and inactive sit at the bottom
+    // Sort: active on top (by display_order), inactive at the bottom
     const sortedServices = useMemo(() => {
         return [...services].sort((a, b) => {
             const aActive = a.status === 'active' ? 0 : 1;
@@ -69,7 +85,7 @@ export default function Services() {
         });
     }, [services]);
 
-    // Filter by search and category for clean viewing
+    // Filter by search and category
     const filteredServices = useMemo(() => {
         return sortedServices.filter((s) => {
             const matchSearch = !search || s.name.toLowerCase().includes(search.toLowerCase()) || (s.description && s.description.toLowerCase().includes(search.toLowerCase()));
@@ -77,6 +93,10 @@ export default function Services() {
             return matchSearch && matchCat;
         });
     }, [sortedServices, search, categoryFilter]);
+
+    // Active vs Inactive partitioning for clean visual grouping
+    const activeServices = useMemo(() => filteredServices.filter(s => s.status === 'active'), [filteredServices]);
+    const inactiveServices = useMemo(() => filteredServices.filter(s => s.status !== 'active'), [filteredServices]);
 
     const openAdd = () => {
         setForm({ name: '', category: 'residential', description: '', base_price: '', status: 'active' });
@@ -136,7 +156,7 @@ export default function Services() {
         }
     };
 
-    // ── Drag-and-drop & Step reorder handlers ──────────────────────────────
+    // ── Drag & Drop / Step Reordering ─────────────────────────────────
     const handleDragStart = (index) => { dragItem.current = index; };
     const handleDragEnter = (index) => { dragOverItem.current = index; };
 
@@ -154,7 +174,6 @@ export default function Services() {
         setServices(reordered);
         dragItem.current = null;
         dragOverItem.current = null;
-
         await persistReorder(reordered);
     };
 
@@ -174,7 +193,7 @@ export default function Services() {
             await api.post('/services/reorder', {
                 order: reordered.map((s) => ({ id: s.id })),
             });
-            showToast('Order saved — synced with customer booking page.', 'success');
+            showToast('Order saved — synced with customer booking.', 'success');
         } catch {
             showToast('Failed to save order — please refresh.', 'error');
             fetchServices();
@@ -189,8 +208,8 @@ export default function Services() {
     };
 
     const totalSvcs = services.length;
-    const activeSvcs = services.filter(s => s.status === 'active').length;
-    const inactiveSvcs = totalSvcs - activeSvcs;
+    const activeCount = services.filter(s => s.status === 'active').length;
+    const inactiveCount = totalSvcs - activeCount;
     const totalBookings = services.reduce((acc, s) => acc + (s.bookings_count || 0), 0);
 
     return (
@@ -214,74 +233,83 @@ export default function Services() {
                 </div>
             )}
 
-            {/* View Modal — Clean Details Sheet */}
+            {/* View Modal — Rich Details & Customer Preview Drawer */}
             {viewModal && (
                 <Overlay onClose={() => setViewModal(null)} title="Service Details">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                        {/* Header info */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                        {/* Service Header */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                             <ServiceLetterAvatar name={viewModal.name} status={viewModal.status} size={48} />
                             <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 18, fontWeight: 800, color: brand.navy }}>{viewModal.name}</div>
                                 <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
+                                    <CategoryPill category={viewModal.category} />
                                     <span style={{
-                                        fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
-                                        background: (CATEGORY_CONFIG[viewModal.category] || CATEGORY_CONFIG.residential).bg,
-                                        color: (CATEGORY_CONFIG[viewModal.category] || CATEGORY_CONFIG.residential).color,
-                                        border: `1px solid ${(CATEGORY_CONFIG[viewModal.category] || CATEGORY_CONFIG.residential).border}`,
+                                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+                                        background: viewModal.status === 'active' ? '#f0fdf4' : '#f8fafc',
+                                        color: viewModal.status === 'active' ? '#166534' : '#64748b',
+                                        border: `1px solid ${viewModal.status === 'active' ? '#dcfce7' : '#e2e8f0'}`,
+                                        display: 'inline-flex', alignItems: 'center', gap: 5,
                                     }}>
-                                        {(CATEGORY_CONFIG[viewModal.category] || CATEGORY_CONFIG.residential).label}
-                                    </span>
-                                    <span style={statusBadge(viewModal.status)}>
-                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
-                                        {viewModal.status === 'active' ? 'Active' : 'Inactive'}
+                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: viewModal.status === 'active' ? '#16a34a' : '#94a3b8' }} />
+                                        {viewModal.status === 'active' ? 'Active on Booking' : 'Inactive (Hidden)'}
                                     </span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Customer visibility indicator */}
-                        <div style={{
-                            padding: '10px 14px', borderRadius: 10,
-                            background: viewModal.status === 'active' ? '#f0fdf4' : '#f8fafc',
-                            border: `1px solid ${viewModal.status === 'active' ? '#dcfce7' : '#e2e8f0'}`,
-                            fontSize: 12, color: viewModal.status === 'active' ? '#166534' : '#64748b',
-                            display: 'flex', alignItems: 'center', gap: 8,
-                        }}>
-                            <span style={{ fontSize: 14 }}>{viewModal.status === 'active' ? '✓' : '•'}</span>
-                            <span>{viewModal.status === 'active' ? 'Active — Currently displayed on customer booking page' : 'Inactive — Hidden from customer booking page (sits at bottom of list)'}</span>
-                        </div>
-
-                        {/* Financial & operations specs */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-                            <div style={{ padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Starting Rate</div>
-                                <div style={{ fontSize: 18, fontWeight: 800, color: '#2563eb', marginTop: 2 }}>AED {Number(viewModal.base_price || 0).toFixed(2)}</div>
-                            </div>
-                            <div style={{ padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Customer Order</div>
-                                <div style={{ fontSize: 18, fontWeight: 800, color: brand.navy, marginTop: 2 }}>#{viewModal.display_order || '—'}</div>
-                            </div>
-                            <div style={{ padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Total Bookings</div>
-                                <div style={{ fontSize: 18, fontWeight: 800, color: brand.navy, marginTop: 2 }}>{viewModal.bookings_count || 0}</div>
-                            </div>
-                            <div style={{ padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Generated Revenue</div>
-                                <div style={{ fontSize: 18, fontWeight: 800, color: brand.navy, marginTop: 2 }}>AED {Number(viewModal.total_revenue || ((viewModal.bookings_count || 0) * (viewModal.base_price || 0))).toLocaleString()}</div>
-                            </div>
-                        </div>
-
-                        {/* Full Description */}
+                        {/* Customer Live Preview Box */}
                         <div>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Full Description</div>
-                            <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.6, padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
-                                {viewModal.description || 'No description provided.'}
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                                </svg>
+                                <span>Customer Booking View Preview</span>
+                            </div>
+                            <div style={{
+                                padding: '14px 16px', borderRadius: 14,
+                                border: '1.5px solid #e2e8f0', background: '#fff',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                    <CategoryPill category={viewModal.category} />
+                                    <div style={{
+                                        width: 18, height: 18, borderRadius: '50%',
+                                        border: '5px solid #0A2342', background: '#fff',
+                                        boxSizing: 'border-box',
+                                    }} />
+                                </div>
+                                <div style={{ fontSize: 14, fontWeight: 800, color: brand.navy, marginBottom: 4 }}>
+                                    {viewModal.name}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginBottom: 10 }}>
+                                    {viewModal.description || 'Complete professional residential cleaning tailored to your residence.'}
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Starting Rate</span>
+                                    <span style={{ fontSize: 13, fontWeight: 800, color: brand.navy }}>AED {Number(viewModal.base_price || 0).toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Specs & Operational Numbers */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                            <div style={{ padding: '10px 12px', borderRadius: 10, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Starting Rate</div>
+                                <div style={{ fontSize: 15, fontWeight: 800, color: brand.navy, marginTop: 2 }}>AED {Number(viewModal.base_price || 0).toFixed(2)}</div>
+                            </div>
+                            <div style={{ padding: '10px 12px', borderRadius: 10, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Booking Slot</div>
+                                <div style={{ fontSize: 15, fontWeight: 800, color: brand.navy, marginTop: 2 }}>#{viewModal.display_order || '—'}</div>
+                            </div>
+                            <div style={{ padding: '10px 12px', borderRadius: 10, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Bookings Count</div>
+                                <div style={{ fontSize: 15, fontWeight: 800, color: brand.navy, marginTop: 2 }}>{viewModal.bookings_count || 0}</div>
                             </div>
                         </div>
 
                         {/* Action buttons */}
-                        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
                             <HoverBtn
                                 onClick={() => {
                                     const target = viewModal;
@@ -302,11 +330,11 @@ export default function Services() {
                                     ...outlineBtnToken,
                                     flex: 1,
                                     justifyContent: 'center',
-                                    borderColor: viewModal.status === 'active' ? '#fca5a5' : '#86efac',
-                                    color: viewModal.status === 'active' ? '#dc2626' : '#166534',
+                                    borderColor: viewModal.status === 'active' ? '#fca5a5' : '#cbd5e1',
+                                    color: viewModal.status === 'active' ? '#dc2626' : brand.navy,
                                 }}
                                 hoverStyle={{
-                                    background: viewModal.status === 'active' ? '#fef2f2' : '#f0fdf4',
+                                    background: viewModal.status === 'active' ? '#fef2f2' : '#f8fafc',
                                     transform: 'translateY(-1px)'
                                 }}
                             >
@@ -329,17 +357,17 @@ export default function Services() {
                 <Overlay onClose={() => setDeleteModal(null)}>
                     <div style={{ textAlign: 'center' }}>
                         <div style={{
-                            width: 52, height: 52, borderRadius: 14, background: '#fee2e2',
+                            width: 50, height: 50, borderRadius: 14, background: '#fee2e2',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            margin: '0 auto 16px', color: '#dc2626',
+                            margin: '0 auto 14px', color: '#dc2626',
                         }}>
                             <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6M9 6V4h6v2" />
                             </svg>
                         </div>
-                        <h3 style={{ fontSize: 18, fontWeight: 800, color: brand.navy, margin: '0 0 8px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Delete Service?</h3>
-                        <p style={{ color: '#64748b', fontSize: 14, margin: '0 0 24px' }}>
-                            Are you sure you want to delete <strong>{deleteModal.name}</strong>?
+                        <h3 style={{ fontSize: 17, fontWeight: 800, color: brand.navy, margin: '0 0 8px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Delete Service?</h3>
+                        <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 20px', lineHeight: 1.5 }}>
+                            Are you sure you want to delete <strong>{deleteModal.name}</strong>? This action cannot be undone.
                         </p>
                         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                             <HoverBtn onClick={() => setDeleteModal(null)} base={outlineBtnToken} hoverStyle={{ background: '#f1f5f9', borderColor: '#cbd5e1', color: brand.navy }}>Cancel</HoverBtn>
@@ -349,10 +377,10 @@ export default function Services() {
                 </Overlay>
             )}
 
-            {/* Add/Edit Modal */}
+            {/* Add / Edit Modal */}
             {formModal !== null && (
                 <Overlay onClose={() => setFormModal(null)} title={formModal === 'add' ? 'Add New Service' : 'Edit Service'}>
-                    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
                         <FieldGroup label="Service Name" required>
                             <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                                 placeholder="e.g. Villa Deep Cleaning" style={inputStyleToken} />
@@ -380,7 +408,7 @@ export default function Services() {
                                 <option value="inactive">Inactive (Hidden from Customers)</option>
                             </select>
                         </FieldGroup>
-                        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
                             <HoverBtn type="button" onClick={() => setFormModal(null)} base={{ ...outlineBtnToken, flex: 1, justifyContent: 'center' }} hoverStyle={{ background: '#f1f5f9', borderColor: '#cbd5e1', color: brand.navy }}>Cancel</HoverBtn>
                             <HoverBtn type="submit" disabled={formLoading} base={{ ...solidBtnToken, flex: 1, justifyContent: 'center', opacity: formLoading ? 0.6 : 1 }} hoverStyle={{ opacity: 0.88, transform: 'translateY(-1px)', boxShadow: '0 6px 18px rgba(10,35,66,0.3)' }}>
                                 {formLoading ? 'Saving...' : 'Save Service'}
@@ -391,22 +419,22 @@ export default function Services() {
             )}
 
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div>
                     <h1 style={pageTitle}>Services</h1>
-                    <p style={pageSubtitle}>Manage services, categories, and customer booking order</p>
+                    <p style={pageSubtitle}>Manage services, categories, and customer booking display order</p>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                     <HoverBtn
                         onClick={() => setReorderMode((v) => !v)}
                         base={{
                             ...outlineBtnToken,
-                            background: reorderMode ? '#eff6ff' : '#fff',
-                            borderColor: reorderMode ? '#2563eb' : brand.border,
-                            color: reorderMode ? '#2563eb' : '#334155',
+                            background: reorderMode ? '#f1f5f9' : '#fff',
+                            borderColor: reorderMode ? brand.navy : brand.border,
+                            color: brand.navy,
                         }}
                         hoverStyle={{
-                            background: reorderMode ? '#dbeafe' : '#f8fafc',
+                            background: '#f8fafc',
                             borderColor: '#cbd5e1',
                             transform: 'translateY(-1px)',
                         }}
@@ -431,40 +459,39 @@ export default function Services() {
                 </div>
             </div>
 
-            {/* Clean, Minimal Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+            {/* Minimal Stat Chips */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 18 }}>
                 <MinimalStatCard label="Total Services" value={totalSvcs} />
-                <MinimalStatCard label="Active on Booking" value={activeSvcs} color="#059669" />
-                <MinimalStatCard label="Inactive (Hidden)" value={inactiveSvcs} color="#64748b" />
-                <MinimalStatCard label="Total Bookings" value={totalBookings} color="#2563eb" />
+                <MinimalStatCard label="Active on Booking" value={activeCount} />
+                <MinimalStatCard label="Inactive (Hidden)" value={inactiveCount} />
+                <MinimalStatCard label="Total Bookings" value={totalBookings} />
             </div>
 
-            {/* Search & Category Filter Bar */}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+            {/* Search & Category Tabs */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: 8,
                     background: '#fff', border: `1.5px solid ${brand.border}`,
-                    borderRadius: 12, padding: '0 14px', flex: 1, minWidth: 260, maxWidth: 380,
+                    borderRadius: 12, padding: '0 12px', flex: 1, minWidth: 240, maxWidth: 360,
                 }}>
-                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth="2">
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth="2">
                         <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
                     </svg>
                     <input
                         type="text"
-                        placeholder="Search service name..."
+                        placeholder="Search services..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        style={{ border: 'none', outline: 'none', padding: '10px 0', fontSize: 13, width: '100%', background: 'transparent', color: brand.navy }}
+                        style={{ border: 'none', outline: 'none', padding: '9px 0', fontSize: 13, width: '100%', background: 'transparent', color: brand.navy }}
                     />
                     {search && (
-                        <button type="button" onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 14 }}>✕</button>
+                        <button type="button" onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>✕</button>
                     )}
                 </div>
 
-                {/* Filter Tabs */}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {[
-                        { key: 'all', label: 'All Categories' },
+                        { key: 'all', label: 'All' },
                         { key: 'residential', label: 'Residential' },
                         { key: 'commercial', label: 'Commercial' },
                         { key: 'specialized', label: 'Specialized' },
@@ -477,7 +504,7 @@ export default function Services() {
                                 type="button"
                                 onClick={() => setCategoryFilter(tab.key)}
                                 style={{
-                                    padding: '7px 12px', borderRadius: 9999, fontSize: 12, fontWeight: 600,
+                                    padding: '6px 12px', borderRadius: 9999, fontSize: 12, fontWeight: 600,
                                     border: isSelected ? 'none' : `1.5px solid ${brand.border}`,
                                     background: isSelected ? '#0A2342' : '#fff',
                                     color: isSelected ? '#fff' : '#64748b',
@@ -491,180 +518,237 @@ export default function Services() {
                 </div>
             </div>
 
-            {/* Table */}
+            {/* Table Container */}
             <div style={{ ...card, overflow: 'hidden' }}>
-                {/* Reorder hint banner */}
+                {/* Reorder Hint */}
                 {reorderMode && (
                     <div style={{
-                        padding: '12px 20px', background: '#eff6ff',
+                        padding: '10px 18px', background: '#f8fafc',
                         borderBottom: `1px solid ${brand.border}`,
-                        fontSize: 12, color: '#2563eb', fontWeight: 600,
+                        fontSize: 12, color: brand.navy, fontWeight: 600,
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>Drag <strong>⠿</strong> or click <strong>▲ ▼</strong> to reorder. Services display in customer booking 2-column layout in this exact order. Inactive services sit at the bottom.</span>
+                            <span>Reorder mode: drag rows or use ▲ ▼ arrows. Synced directly with customer booking page.</span>
                         </div>
-                        {reordering && <span style={{ color: '#1e40af', fontWeight: 700 }}>Saving order...</span>}
+                        {reordering && <span style={{ color: '#64748b', fontSize: 11 }}>Saving order...</span>}
                     </div>
                 )}
 
-                {/* Table Header: Clean, minimal, scannable */}
+                {/* Table Header */}
                 <div style={{
                     ...thRow,
                     gridTemplateColumns: reorderMode
-                        ? '32px 2.2fr 130px 120px 100px 110px 100px'
-                        : '2.2fr 130px 120px 100px 110px 100px',
+                        ? '30px 2.6fr 150px 130px 120px 96px'
+                        : '2.6fr 150px 130px 120px 96px',
                 }}>
                     {reorderMode && <span />}
                     <Th>SERVICE</Th>
                     <Th>CATEGORY</Th>
-                    <Th>BASE RATE</Th>
-                    <Th>BOOKINGS</Th>
+                    <Th>STARTING RATE</Th>
                     <Th>STATUS</Th>
                     <Th style={{ textAlign: 'right' }}>ACTIONS</Th>
                 </div>
 
                 {loading ? (
-                    <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8', fontSize: 13 }}>Loading services...</div>
+                    <div style={{ textAlign: 'center', padding: 50, color: '#94a3b8', fontSize: 13 }}>Loading services...</div>
                 ) : filteredServices.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 48 }}>
                         <div style={{ fontWeight: 700, color: brand.navy, fontSize: 14, marginBottom: 4 }}>No services found</div>
                         <div style={{ color: '#64748b', fontSize: 12 }}>Try adjusting your search or category filter.</div>
                     </div>
                 ) : (
-                    filteredServices.map((svc, index) => {
-                        const bookings = svc.bookings_count || 0;
-                        const isActive = svc.status === 'active';
-                        const catConfig = CATEGORY_CONFIG[svc.category] || CATEGORY_CONFIG.residential;
+                    <div>
+                        {/* 1. Active Services Group */}
+                        {activeServices.map((svc, index) => {
+                            return (
+                                <ServiceRow
+                                    key={svc.id}
+                                    svc={svc}
+                                    index={index}
+                                    reorderMode={reorderMode}
+                                    onDragStart={handleDragStart}
+                                    onDragEnter={handleDragEnter}
+                                    onDragEnd={handleDragEnd}
+                                    onView={() => setViewModal(svc)}
+                                    onEdit={() => openEdit(svc)}
+                                    onDelete={() => setDeleteModal(svc)}
+                                    onToggle={() => handleToggle(svc)}
+                                    onMoveUp={() => moveService(index, -1)}
+                                    onMoveDown={() => moveService(index, 1)}
+                                    canMoveUp={index > 0}
+                                    canMoveDown={index < sortedServices.length - 1}
+                                />
+                            );
+                        })}
 
-                        return (
-                            <div
-                                key={svc.id}
-                                draggable={reorderMode}
-                                onDragStart={() => handleDragStart(index)}
-                                onDragEnter={() => handleDragEnter(index)}
-                                onDragEnd={handleDragEnd}
-                                onDragOver={(e) => e.preventDefault()}
-                                onClick={() => !reorderMode && setViewModal(svc)}
-                                style={{
-                                    ...tdRow,
-                                    gridTemplateColumns: reorderMode
-                                        ? '32px 2.2fr 130px 120px 100px 110px 100px'
-                                        : '2.2fr 130px 120px 100px 110px 100px',
-                                    cursor: reorderMode ? 'grab' : 'pointer',
-                                    userSelect: reorderMode ? 'none' : 'auto',
-                                    background: !isActive ? '#fafbfc' : '#fff',
-                                    opacity: !isActive ? 0.8 : 1,
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = !isActive ? '#f1f5f9' : '#f8fafc'}
-                                onMouseLeave={e => e.currentTarget.style.background = !isActive ? '#fafbfc' : '#fff'}>
-
-                                {/* Drag handle */}
-                                {reorderMode && (
-                                    <div style={{
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        color: '#94a3b8', fontSize: 16, letterSpacing: 1, cursor: 'grab',
-                                        userSelect: 'none',
-                                    }} title="Drag to reorder">⠿</div>
-                                )}
-
-                                {/* Service (Avatar + Name + ID) */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    <ServiceLetterAvatar name={svc.name} status={svc.status} size={38} />
-                                    <div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: brand.navy }}>{svc.name}</div>
-                                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500, marginTop: 1 }}>
-                                            SVC-{String(svc.id).padStart(3, '0')} · Order #{svc.display_order || index + 1}
-                                        </div>
-                                    </div>
+                        {/* 2. Inactive Services Group (Cleanly sits at the bottom) */}
+                        {inactiveServices.length > 0 && (
+                            <div>
+                                <div style={{
+                                    padding: '8px 18px', background: '#f8fafc',
+                                    borderTop: `1px solid ${brand.border}`, borderBottom: `1px solid ${brand.border}`,
+                                    fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: 0.8, textTransform: 'uppercase',
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#94a3b8' }} />
+                                    <span>Inactive Services ({inactiveServices.length}) — Hidden from customer booking</span>
                                 </div>
-
-                                {/* Category Badge */}
-                                <div>
-                                    <span style={{
-                                        display: 'inline-block',
-                                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
-                                        background: catConfig.bg, color: catConfig.color, border: `1px solid ${catConfig.border}`,
-                                    }}>
-                                        {catConfig.label}
-                                    </span>
-                                </div>
-
-                                {/* Base Rate */}
-                                <div style={{ fontSize: 13, fontWeight: 800, color: '#2563eb' }}>
-                                    AED {Number(svc.base_price || 0).toFixed(2)}
-                                </div>
-
-                                {/* Bookings */}
-                                <div style={{ fontSize: 13, fontWeight: 600, color: brand.navy }}>
-                                    {bookings}
-                                </div>
-
-                                {/* Status */}
-                                <div onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleToggle(svc)}
-                                        style={{
-                                            ...statusBadge(isActive ? 'active' : 'inactive'),
-                                            border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                                        }}
-                                        title="Click to toggle active/inactive status"
-                                    >
-                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
-                                        {isActive ? 'Active' : 'Inactive'}
-                                    </button>
-                                </div>
-
-                                {/* Actions + Reorder arrows */}
-                                <div
-                                    onClick={(e) => e.stopPropagation()}
-                                    style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}
-                                >
-                                    {reorderMode && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginRight: 2 }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => moveService(index, -1)}
-                                                disabled={index === 0}
-                                                style={{
-                                                    width: 22, height: 16, borderRadius: 4, border: `1px solid ${brand.border}`,
-                                                    background: index === 0 ? '#f8fafc' : '#fff', color: index === 0 ? '#cbd5e1' : brand.navy,
-                                                    cursor: index === 0 ? 'default' : 'pointer', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                                }}
-                                                title="Move up"
-                                            >▲</button>
-                                            <button
-                                                type="button"
-                                                onClick={() => moveService(index, 1)}
-                                                disabled={index === sortedServices.length - 1}
-                                                style={{
-                                                    width: 22, height: 16, borderRadius: 4, border: `1px solid ${brand.border}`,
-                                                    background: index === sortedServices.length - 1 ? '#f8fafc' : '#fff', color: index === sortedServices.length - 1 ? '#cbd5e1' : brand.navy,
-                                                    cursor: index === sortedServices.length - 1 ? 'default' : 'pointer', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                                }}
-                                                title="Move down"
-                                            >▼</button>
-                                        </div>
-                                    )}
-                                    <ActionBtn title="View" onClick={() => setViewModal(svc)} icon={eyeIcon} />
-                                    <ActionBtn title="Edit" onClick={() => openEdit(svc)} icon={editIcon} />
-                                    <ActionBtn title="Delete" danger onClick={() => setDeleteModal(svc)} icon={trashIcon} />
-                                </div>
+                                {inactiveServices.map((svc, index) => {
+                                    const actualIndex = activeServices.length + index;
+                                    return (
+                                        <ServiceRow
+                                            key={svc.id}
+                                            svc={svc}
+                                            index={actualIndex}
+                                            reorderMode={reorderMode}
+                                            onDragStart={handleDragStart}
+                                            onDragEnter={handleDragEnter}
+                                            onDragEnd={handleDragEnd}
+                                            onView={() => setViewModal(svc)}
+                                            onEdit={() => openEdit(svc)}
+                                            onDelete={() => setDeleteModal(svc)}
+                                            onToggle={() => handleToggle(svc)}
+                                            onMoveUp={() => moveService(actualIndex, -1)}
+                                            onMoveDown={() => moveService(actualIndex, 1)}
+                                            canMoveUp={actualIndex > 0}
+                                            canMoveDown={actualIndex < sortedServices.length - 1}
+                                        />
+                                    );
+                                })}
                             </div>
-                        );
-                    })
+                        )}
+                    </div>
                 )}
 
-                <div style={{ padding: '12px 20px', borderTop: `1px solid ${brand.border}`, fontSize: 12, color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Showing {filteredServices.length} of {services.length} services</span>
-                    <span style={{ color: '#94a3b8' }}>
-                        Click any service row to view full details
-                    </span>
+                {/* Footer Info */}
+                <div style={{
+                    padding: '12px 18px', borderTop: `1px solid ${brand.border}`,
+                    fontSize: 12, color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                    <span>{filteredServices.length} of {services.length} services ({activeCount} active, {inactiveCount} inactive)</span>
+                    <span style={{ color: '#94a3b8' }}>Click any row to view full details & customer preview</span>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+/* ── Minimal Table Row ─────────────────────────────────────────── */
+function ServiceRow({
+    svc, index, reorderMode,
+    onDragStart, onDragEnter, onDragEnd,
+    onView, onEdit, onDelete, onToggle,
+    onMoveUp, onMoveDown, canMoveUp, canMoveDown
+}) {
+    const isActive = svc.status === 'active';
+
+    return (
+        <div
+            draggable={reorderMode}
+            onDragStart={() => onDragStart(index)}
+            onDragEnter={() => onDragEnter(index)}
+            onDragEnd={onDragEnd}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => !reorderMode && onView()}
+            style={{
+                ...tdRow,
+                gridTemplateColumns: reorderMode
+                    ? '30px 2.6fr 150px 130px 120px 96px'
+                    : '2.6fr 150px 130px 120px 96px',
+                cursor: reorderMode ? 'grab' : 'pointer',
+                userSelect: reorderMode ? 'none' : 'auto',
+                background: !isActive ? '#fafbfc' : '#fff',
+                opacity: !isActive ? 0.78 : 1,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = !isActive ? '#f1f5f9' : '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = !isActive ? '#fafbfc' : '#fff'}
+        >
+            {/* Reorder drag handle */}
+            {reorderMode && (
+                <div style={{ color: '#94a3b8', fontSize: 15, cursor: 'grab', userSelect: 'none' }} title="Drag to reorder">
+                    ⠿
+                </div>
+            )}
+
+            {/* Service Avatar + Name */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <ServiceLetterAvatar name={svc.name} status={svc.status} size={36} />
+                <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>{svc.name}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                        Order #{svc.display_order || index + 1}
+                    </div>
+                </div>
+            </div>
+
+            {/* Category */}
+            <div>
+                <CategoryPill category={svc.category} />
+            </div>
+
+            {/* Starting Rate */}
+            <div style={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>
+                AED {Number(svc.base_price || 0).toFixed(2)}
+            </div>
+
+            {/* Status (Clickable Toggle) */}
+            <div onClick={(e) => e.stopPropagation()}>
+                <button
+                    type="button"
+                    onClick={onToggle}
+                    style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '3px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 600,
+                        border: `1px solid ${isActive ? '#dcfce7' : '#e2e8f0'}`,
+                        background: isActive ? '#f0fdf4' : '#f8fafc',
+                        color: isActive ? '#166534' : '#64748b',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                    title="Click to toggle active/inactive status"
+                >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: isActive ? '#16a34a' : '#94a3b8' }} />
+                    {isActive ? 'Active' : 'Inactive'}
+                </button>
+            </div>
+
+            {/* Actions */}
+            <div
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}
+            >
+                {reorderMode && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginRight: 2 }}>
+                        <button
+                            type="button"
+                            onClick={onMoveUp}
+                            disabled={!canMoveUp}
+                            style={{
+                                width: 20, height: 15, borderRadius: 3, border: `1px solid ${brand.border}`,
+                                background: !canMoveUp ? '#f8fafc' : '#fff', color: !canMoveUp ? '#cbd5e1' : brand.navy,
+                                cursor: !canMoveUp ? 'default' : 'pointer', fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                            title="Move up"
+                        >▲</button>
+                        <button
+                            type="button"
+                            onClick={onMoveDown}
+                            disabled={!canMoveDown}
+                            style={{
+                                width: 20, height: 15, borderRadius: 3, border: `1px solid ${brand.border}`,
+                                background: !canMoveDown ? '#f8fafc' : '#fff', color: !canMoveDown ? '#cbd5e1' : brand.navy,
+                                cursor: !canMoveDown ? 'default' : 'pointer', fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                            title="Move down"
+                        >▼</button>
+                    </div>
+                )}
+                <ActionBtn title="View" onClick={onView} icon={eyeIcon} />
+                <ActionBtn title="Edit" onClick={onEdit} icon={editIcon} />
+                <ActionBtn title="Delete" danger onClick={onDelete} icon={trashIcon} />
             </div>
         </div>
     );
@@ -672,11 +756,11 @@ export default function Services() {
 
 /* ── Minimal Sub-components ─────────────────────────── */
 
-function MinimalStatCard({ label, value, color = brand.navy }) {
+function MinimalStatCard({ label, value }) {
     return (
-        <div style={{ ...card, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</span>
-            <span style={{ fontSize: 24, fontWeight: 800, color, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{value}</span>
+        <div style={{ ...card, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: brand.navy, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{value}</span>
         </div>
     );
 }
@@ -685,8 +769,11 @@ function Overlay({ children, onClose, title }) {
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(6,20,41,0.5)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={e => e.target === e.currentTarget && onClose()}>
-            <div style={{ background: '#fff', borderRadius: 18, padding: 28, width: 460, maxWidth: '92vw', boxShadow: '0 20px 50px rgba(10,35,66,0.18)' }}>
-                {title && <h3 style={{ margin: '0 0 18px', fontSize: 18, fontWeight: 800, color: brand.navy, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</h3>}
+            <div style={{ background: '#fff', borderRadius: 18, padding: 26, width: 460, maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(10,35,66,0.18)', position: 'relative' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: title ? 16 : 0 }}>
+                    {title && <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: brand.navy, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</h3>}
+                    <button type="button" onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 16, padding: 4, lineHeight: 1 }}>✕</button>
+                </div>
                 {children}
             </div>
         </div>
@@ -696,7 +783,7 @@ function Overlay({ children, onClose, title }) {
 function FieldGroup({ label, required, children }) {
     return (
         <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
                 {label}{required && <span style={{ color: '#dc2626' }}> *</span>}
             </label>
             {children}
@@ -728,9 +815,9 @@ function HoverBtn({ children, onClick, base, hoverStyle, type = 'button', disabl
 function ActionBtn({ title, onClick, icon, danger }) {
     const [hovered, setHovered] = useState(false);
     const isView = title === 'View';
-    const bgHover = danger ? '#fef2f2' : isView ? '#eff6ff' : '#f1f5f9';
-    const borderHover = danger ? '#fecaca' : isView ? '#bfdbfe' : '#cbd5e1';
-    const textHover = danger ? '#dc2626' : isView ? '#2563eb' : brand.navy;
+    const bgHover = danger ? '#fef2f2' : isView ? '#f1f5f9' : '#f1f5f9';
+    const borderHover = danger ? '#fecaca' : '#cbd5e1';
+    const textHover = danger ? '#dc2626' : brand.navy;
     return (
         <button
             title={title}
@@ -738,14 +825,14 @@ function ActionBtn({ title, onClick, icon, danger }) {
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             style={{
-                width: 30, height: 30, borderRadius: 8,
+                width: 28, height: 28, borderRadius: 8,
                 border: `1.5px solid ${hovered ? borderHover : brand.border}`,
                 background: hovered ? bgHover : '#fff',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: hovered ? textHover : '#64748b',
                 transition: 'all 0.15s',
                 transform: hovered ? 'translateY(-1px)' : 'none',
-                boxShadow: hovered ? '0 3px 8px rgba(0,0,0,0.06)' : 'none',
+                boxShadow: hovered ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
             }}
         >{icon}</button>
     );
@@ -753,12 +840,12 @@ function ActionBtn({ title, onClick, icon, danger }) {
 
 const thRow = {
     display: 'grid',
-    padding: '12px 20px', borderBottom: `1px solid ${brand.border}`, background: brand.softBg,
+    padding: '11px 18px', borderBottom: `1px solid ${brand.border}`, background: brand.softBg,
     alignItems: 'center', gap: 12,
 };
 const tdRow = {
     display: 'grid',
-    padding: '14px 20px', borderBottom: '1px solid #f1f5f9',
+    padding: '12px 18px', borderBottom: '1px solid #f1f5f9',
     alignItems: 'center', gap: 12, transition: 'background 0.15s',
 };
 
