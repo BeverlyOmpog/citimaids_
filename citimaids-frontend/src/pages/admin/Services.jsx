@@ -200,8 +200,13 @@ export default function Services() {
             const reordered = [...sortedServices];
             const [moved] = reordered.splice(from, 1);
             reordered.splice(to, 0, moved);
-            setServices(reordered);
-            await persistReorder(reordered);
+            // Re-assign display_order sequentially so sortedServices updates immediately without refresh
+            const withNewOrders = reordered.map((item, idx) => ({
+                ...item,
+                display_order: idx + 1,
+            }));
+            setServices(withNewOrders);
+            await persistReorder(withNewOrders);
         }
     };
 
@@ -210,7 +215,8 @@ export default function Services() {
             return 'translateY(0px)';
         }
         if (index === draggingIndex) {
-            return 'translateY(0px)';
+            const offset = (dragOverIndex - draggingIndex) * 100;
+            return `translateY(${offset}%)`;
         }
         if (draggingIndex < dragOverIndex) {
             if (index > draggingIndex && index <= dragOverIndex) {
@@ -267,8 +273,12 @@ export default function Services() {
                 <div style={{
                     position: 'fixed', top: 24, right: 24, zIndex: 9999,
                     padding: '12px 20px', borderRadius: 12, fontSize: 13, fontWeight: 600,
-                    background: toast.type === 'success' ? '#0A2342' : '#dc2626', color: '#fff',
-                    boxShadow: '0 8px 24px rgba(10,35,66,0.18)',
+                    background: toast.type === 'success' ? 'rgba(10, 35, 66, 0.85)' : 'rgba(220, 38, 38, 0.85)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#fff',
+                    boxShadow: '0 8px 30px rgba(10,35,66,0.22)',
                     display: 'flex', alignItems: 'center', gap: 8,
                 }}>
                     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -763,13 +773,15 @@ function ServiceRow({
                 cursor: reorderMode ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
                 userSelect: reorderMode ? 'none' : 'auto',
                 background: isDragging
-                    ? '#f0f9ff'
+                    ? '#ffffff'
                     : (!isActive ? '#fafbfc' : '#fff'),
-                opacity: isDragging ? 0.45 : (!isActive ? 0.78 : 1),
-                border: isDragging ? '1.5px dashed #0284c7' : undefined,
+                opacity: 1,
+                border: isDragging ? '1.5px solid #2563eb' : undefined,
+                boxShadow: isDragging ? '0 10px 28px rgba(10,35,66,0.18)' : 'none',
+                borderRadius: isDragging ? 10 : 0,
                 transform: reorderMode ? transform : 'none',
                 transition: reorderMode
-                    ? 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background 0.15s, opacity 0.15s'
+                    ? 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background 0.15s, box-shadow 0.15s'
                     : 'background 0.15s',
                 position: 'relative',
                 zIndex: isDragging ? 10 : 1,
