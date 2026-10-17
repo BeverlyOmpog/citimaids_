@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/clients/{id}', [ClientController::class, 'destroy']);
 
     // Services (admin CRUD)
+    Route::get('/admin/services', [ServiceController::class, 'adminIndex']);
     Route::post('/services', [ServiceController::class, 'store']);
     Route::put('/services/{id}', [ServiceController::class, 'update']);
     Route::delete('/services/{id}', [ServiceController::class, 'destroy']);

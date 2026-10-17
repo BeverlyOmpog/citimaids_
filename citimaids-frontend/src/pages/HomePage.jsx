@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { services } from '../data/services';
+import { useServices } from '../hooks/useServices';
 import { useSettings } from '../hooks/useSettings';
 import Reveal from '../components/Reveal';
 import BeforeAfterSlider from '../components/BeforeAfterSlider';
@@ -189,6 +189,7 @@ function FAQCard({ q, a, index }) {
 
 export default function HomePage() {
   const { settings } = useSettings();
+  const { services } = useServices();
   
   // Safely extract city from the address or default to 'Abu Dhabi'
   const addressParts = settings?.business_address ? settings.business_address.split(',') : [];
@@ -464,7 +465,7 @@ export default function HomePage() {
                 to="/services"
                 className="inline-flex items-center gap-2 text-sm font-extrabold text-blue-900 hover:text-blue-700 transition-colors"
               >
-                <span>View all 7 services</span>
+                <span>View all {services.length} services</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                 </svg>

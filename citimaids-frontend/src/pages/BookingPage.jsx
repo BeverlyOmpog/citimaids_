@@ -103,7 +103,10 @@ export default function BookingPage() {
   // Once services load, pick the preselected one (or first active)
   useEffect(() => {
     if (services.length === 0) return;
-    if (data.serviceId !== null) return; // already set
+
+    // Check if the current serviceId is valid in the loaded active services
+    const currentValid = data.serviceId !== null && services.some((s) => s.id === data.serviceId || String(s.id) === String(data.serviceId));
+    if (currentValid) return; // already set to a valid active service
 
     let picked = services[0];
 
@@ -114,8 +117,10 @@ export default function BookingPage() {
       picked = byId || bySlug || services[0];
     }
 
-    setData((prev) => ({ ...prev, serviceId: picked.id }));
-  }, [services]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (picked) {
+      setData((prev) => ({ ...prev, serviceId: picked.id }));
+    }
+  }, [services, preselectedServiceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -352,6 +357,15 @@ export default function BookingPage() {
                   ))}
                   <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }`}</style>
                 </div>
+              ) : services.length === 0 ? (
+                <div style={{
+                  padding: '36px 20px', borderRadius: 14,
+                  background: '#f8fafc', border: '1.5px dashed #cbd5e1',
+                  textAlign: 'center',
+                }}>
+                  <p style={{ color: '#0A2342', fontWeight: 700, fontSize: 15, margin: '0 0 6px' }}>No Active Services Available</p>
+                  <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Please check back later or contact customer support directly.</p>
+                </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {services.map((s) => {
@@ -373,8 +387,8 @@ export default function BookingPage() {
                         <div>
                           <div style={{ fontWeight: 700, fontSize: 14, color: '#0A2342' }}>{s.title}</div>
                           <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', marginTop: 2 }}>{s.startingPrice}</div>
-                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                            {s.description}
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {s.description || 'Professional cleaning services across Abu Dhabi & UAE.'}
                           </div>
                         </div>
                       </label>

@@ -9,16 +9,34 @@ use Illuminate\Support\Facades\DB;
 
 class ServiceController extends Controller
 {
+    /**
+     * Public services list (customer-facing).
+     * Always returns ONLY active services, ensuring inactive ones never show on customer booking.
+     */
     public function index(Request $request)
     {
         $query = Service::withCount('bookings')->orderBy('display_order');
 
-        // Admin (authenticated) sees all; public customers only see active
-        if (! $request->user()) {
+        // Allow authenticated admin to view all only if explicitly requesting ?all=1
+        $user = $request->user('sanctum') ?? auth('sanctum')->user();
+        if (! ($user && $request->boolean('all'))) {
             $query->where('status', 'active');
         }
 
         return response()->json($query->get());
+    }
+
+    /**
+     * Admin services management endpoint.
+     * Returns all services (active and inactive) with booking stats.
+     */
+    public function adminIndex(Request $request)
+    {
+        $services = Service::withCount('bookings')
+            ->orderBy('display_order')
+            ->get();
+
+        return response()->json($services);
     }
 
     public function store(Request $request)
