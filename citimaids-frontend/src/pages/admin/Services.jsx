@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import api from '../../api/axios';
-import { brand, fonts, pageTitle, pageSubtitle, card, solidBtn as solidBtnToken, outlineBtn as outlineBtnToken, inputStyle as inputStyleToken, selectStyle as selectStyleToken } from './adminStyles';
+import { brand, fonts, pageTitle, pageSubtitle, card, solidBtn as solidBtnToken, outlineBtn as outlineBtnToken, inputStyle as inputStyleToken, selectStyle as selectStyleToken, tabBtn, searchBar as searchBarToken, searchInput as searchInputToken } from './adminStyles';
+
+/* Category tabs matching Bookings tab layout with counts */
+const CATEGORY_TABS = [
+    { key: 'all', label: 'All' },
+    { key: 'residential', label: 'Residential' },
+    { key: 'commercial', label: 'Commercial' },
+    { key: 'specialized', label: 'Specialized' },
+    { key: 'maintenance', label: 'Maintenance' },
+];
 
 /* Category config: dot color for pills, and soft avatar bg/text tint */
 const CATEGORY_CONFIG = {
@@ -214,6 +223,17 @@ export default function Services() {
     const inactiveCount = totalSvcs - activeCount;
     const totalBookings = services.reduce((acc, s) => acc + (s.bookings_count || 0), 0);
 
+    const categoryCounts = useMemo(() => {
+        const counts = { all: services.length, residential: 0, commercial: 0, specialized: 0, maintenance: 0 };
+        services.forEach((s) => {
+            const cat = (s.category || 'residential').toLowerCase();
+            if (counts[cat] !== undefined) {
+                counts[cat]++;
+            }
+        });
+        return counts;
+    }, [services]);
+
     return (
         <div style={{ fontFamily: fonts.body }}>
             {/* Toast */}
@@ -307,18 +327,6 @@ export default function Services() {
                                     </div>
                                 )}
 
-                                {/* Visibility note */}
-                                <div style={{
-                                    fontSize: 12, color: isActive ? '#166534' : '#64748b',
-                                    background: isActive ? '#f0fdf4' : '#f8fafc',
-                                    border: `1px solid ${isActive ? '#dcfce7' : '#e2e8f0'}`,
-                                    borderRadius: 8, padding: '8px 12px',
-                                }}>
-                                    {isActive
-                                        ? '✓ Visible on the customer booking page'
-                                        : '• Hidden from customers — activate to make it bookable'}
-                                </div>
-
                                 {/* Actions */}
                                 <div style={{ display: 'flex', gap: 8 }}>
                                     <HoverBtn
@@ -405,8 +413,8 @@ export default function Services() {
                         </FieldGroup>
                         <FieldGroup label="Status">
                             <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={selectStyleToken}>
-                                <option value="active">Active (Visible on Customer Booking)</option>
-                                <option value="inactive">Inactive (Hidden from Customers)</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
                             </select>
                         </FieldGroup>
                         <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
@@ -460,63 +468,113 @@ export default function Services() {
                 </div>
             </div>
 
-            {/* Minimal Stat Chips */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 18 }}>
-                <MinimalStatCard label="Total Services" value={totalSvcs} />
-                <MinimalStatCard label="Active on Booking" value={activeCount} />
-                <MinimalStatCard label="Inactive (Hidden)" value={inactiveCount} />
-                <MinimalStatCard label="Total Bookings" value={totalBookings} />
+            {/* KPI Summary Cards (Consistent with Billing & Transactions) */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: 16,
+                marginBottom: 24,
+            }}>
+                <KpiCard
+                    label="Total Services"
+                    value={totalSvcs}
+                    color="#2563eb"
+                    iconBg="#dbeafe"
+                    subtitle="All catalog services"
+                    icon={
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                        </svg>
+                    }
+                />
+                <KpiCard
+                    label="Active Services"
+                    value={activeCount}
+                    color="#059669"
+                    iconBg="#d1fae5"
+                    subtitle="Live on customer booking"
+                    icon={
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    }
+                />
+                <KpiCard
+                    label="Inactive Services"
+                    value={inactiveCount}
+                    color="#64748b"
+                    iconBg="#f1f5f9"
+                    subtitle="Currently paused"
+                    icon={
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    }
+                />
+                <KpiCard
+                    label="Total Bookings"
+                    value={totalBookings}
+                    color="#7c3aed"
+                    iconBg="#ede9fe"
+                    subtitle="All customer reservations"
+                    icon={
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 2v4M8 2v4M3 10h18" />
+                        </svg>
+                    }
+                />
             </div>
 
-            {/* Search & Category Tabs */}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    background: '#fff', border: `1.5px solid ${brand.border}`,
-                    borderRadius: 12, padding: '0 12px', flex: 1, minWidth: 240, maxWidth: 360,
-                }}>
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth="2">
+            {/* Search Bar */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+                <div style={searchBarToken}>
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth="2">
                         <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
                     </svg>
                     <input
                         type="text"
-                        placeholder="Search services..."
+                        placeholder="Search services by name or description..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        style={{ border: 'none', outline: 'none', padding: '9px 0', fontSize: 13, width: '100%', background: 'transparent', color: brand.navy }}
+                        style={searchInputToken}
                     />
                     {search && (
-                        <button type="button" onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>✕</button>
+                        <button
+                            type="button"
+                            onClick={() => setSearch('')}
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 13, padding: 4 }}
+                        >✕</button>
                     )}
                 </div>
+            </div>
 
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {[
-                        { key: 'all', label: 'All' },
-                        { key: 'residential', label: 'Residential' },
-                        { key: 'commercial', label: 'Commercial' },
-                        { key: 'specialized', label: 'Specialized' },
-                        { key: 'maintenance', label: 'Maintenance' },
-                    ].map((tab) => {
-                        const isSelected = categoryFilter === tab.key;
-                        return (
-                            <button
-                                key={tab.key}
-                                type="button"
-                                onClick={() => setCategoryFilter(tab.key)}
-                                style={{
-                                    padding: '6px 12px', borderRadius: 9999, fontSize: 12, fontWeight: 600,
-                                    border: isSelected ? 'none' : `1.5px solid ${brand.border}`,
-                                    background: isSelected ? '#0A2342' : '#fff',
-                                    color: isSelected ? '#fff' : '#64748b',
-                                    cursor: 'pointer', transition: 'all 0.15s',
-                                }}
-                            >
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </div>
+            {/* Category Tabs (styled identical to Bookings page tabs) */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 22, flexWrap: 'wrap' }}>
+                {CATEGORY_TABS.map((tab) => {
+                    const isSelected = categoryFilter === tab.key;
+                    return (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => setCategoryFilter(tab.key)}
+                            style={tabBtn(isSelected)}
+                        >
+                            {tab.label}
+                            <span style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                marginLeft: 4,
+                                opacity: isSelected ? 0.8 : 0.5,
+                            }}>
+                                {categoryCounts[tab.key] || 0}
+                            </span>
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Table Container */}
@@ -596,7 +654,7 @@ export default function Services() {
                                     display: 'flex', alignItems: 'center', gap: 6,
                                 }}>
                                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#94a3b8' }} />
-                                    <span>Inactive Services ({inactiveServices.length}) — Hidden from customer booking</span>
+                                    <span>Inactive Services ({inactiveServices.length})</span>
                                 </div>
                                 {inactiveServices.map((svc, index) => {
                                     const actualIndex = activeServices.length + index;
@@ -630,8 +688,8 @@ export default function Services() {
                     padding: '12px 18px', borderTop: `1px solid ${brand.border}`,
                     fontSize: 12, color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 }}>
-                    <span>{filteredServices.length} of {services.length} services ({activeCount} active, {inactiveCount} inactive)</span>
-                    <span style={{ color: '#94a3b8' }}>Click any row to view full details & customer preview</span>
+                    <span>Showing {filteredServices.length} of {services.length} services</span>
+                    <span style={{ color: '#94a3b8' }}>Click any row to view full details</span>
                 </div>
             </div>
         </div>
@@ -755,13 +813,36 @@ function ServiceRow({
     );
 }
 
-/* ── Minimal Sub-components ─────────────────────────── */
-
-function MinimalStatCard({ label, value }) {
+/* ── KPI Stat Card (Matching Billing & Transactions design) ── */
+function KpiCard({ label, value, color, iconBg, icon, subtitle }) {
     return (
-        <div style={{ ...card, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</span>
-            <span style={{ fontSize: 20, fontWeight: 800, color: brand.navy, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{value}</span>
+        <div style={{ ...card, padding: '18px 20px', borderLeft: `4px solid ${color}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    {label}
+                </span>
+                <span style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: iconBg,
+                    color: color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                }}>
+                    {icon}
+                </span>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: brand.navy, fontFamily: fonts.heading }}>
+                {value}
+            </div>
+            {subtitle && (
+                <div style={{ fontSize: 12, color: color, fontWeight: 600, marginTop: 4 }}>
+                    {subtitle}
+                </div>
+            )}
         </div>
     );
 }
