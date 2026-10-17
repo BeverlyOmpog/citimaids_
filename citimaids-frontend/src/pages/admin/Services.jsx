@@ -69,8 +69,8 @@ export default function Services() {
     const [formLoading, setFormLoading] = useState(false);
     const [reorderMode, setReorderMode] = useState(false);
     const [reordering, setReordering] = useState(false);
-    const dragItem = useRef(null);
-    const dragOverItem = useRef(null);
+    const [draggingIndex, setDraggingIndex] = useState(null);
+    const [dragOverIndex, setDragOverIndex] = useState(null);
 
     useEffect(() => { fetchServices(); }, []);
 
@@ -167,35 +167,61 @@ export default function Services() {
         }
     };
 
-    // ── Drag & Drop / Step Reordering ─────────────────────────────────
-    const handleDragStart = (index) => { dragItem.current = index; };
-    const handleDragEnter = (index) => { dragOverItem.current = index; };
-
-    const handleDragEnd = async () => {
-        const from = dragItem.current;
-        const to   = dragOverItem.current;
-        if (from === null || to === null || from === to) {
-            dragItem.current = null;
-            dragOverItem.current = null;
-            return;
-        }
-        const reordered = [...sortedServices];
-        const [moved] = reordered.splice(from, 1);
-        reordered.splice(to, 0, moved);
-        setServices(reordered);
-        dragItem.current = null;
-        dragOverItem.current = null;
-        await persistReorder(reordered);
+    // ── Smooth Drag & Drop Reordering ─────────────────────────────────
+    const handleDragStart = (e, index) => {
+        setDraggingIndex(index);
+        setDragOverIndex(index);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(index));
     };
 
-    const moveService = async (index, direction) => {
-        const targetIndex = index + direction;
-        if (targetIndex < 0 || targetIndex >= sortedServices.length) return;
-        const reordered = [...sortedServices];
-        const [moved] = reordered.splice(index, 1);
-        reordered.splice(targetIndex, 0, moved);
-        setServices(reordered);
-        await persistReorder(reordered);
+    const handleDragEnter = (e, index) => {
+        e.preventDefault();
+        if (draggingIndex !== null && dragOverIndex !== index) {
+            setDragOverIndex(index);
+        }
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (draggingIndex !== null && dragOverIndex !== index) {
+            setDragOverIndex(index);
+        }
+    };
+
+    const handleDragEnd = async () => {
+        const from = draggingIndex;
+        const to = dragOverIndex;
+        setDraggingIndex(null);
+        setDragOverIndex(null);
+
+        if (from !== null && to !== null && from !== to) {
+            const reordered = [...sortedServices];
+            const [moved] = reordered.splice(from, 1);
+            reordered.splice(to, 0, moved);
+            setServices(reordered);
+            await persistReorder(reordered);
+        }
+    };
+
+    const getRowTransform = (index) => {
+        if (draggingIndex === null || dragOverIndex === null || draggingIndex === dragOverIndex) {
+            return 'translateY(0px)';
+        }
+        if (index === draggingIndex) {
+            return 'translateY(0px)';
+        }
+        if (draggingIndex < dragOverIndex) {
+            if (index > draggingIndex && index <= dragOverIndex) {
+                return 'translateY(-100%)';
+            }
+        } else if (draggingIndex > dragOverIndex) {
+            if (index >= dragOverIndex && index < draggingIndex) {
+                return 'translateY(100%)';
+            }
+        }
+        return 'translateY(0px)';
     };
 
     const persistReorder = async (reordered) => {
@@ -204,7 +230,7 @@ export default function Services() {
             await api.post('/services/reorder', {
                 order: reordered.map((s) => ({ id: s.id })),
             });
-            showToast('Order saved — synced with customer booking.', 'success');
+            showToast('Order saved.', 'success');
         } catch {
             showToast('Failed to save order — please refresh.', 'error');
             fetchServices();
@@ -435,7 +461,15 @@ export default function Services() {
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                     <HoverBtn
-                        onClick={() => setReorderMode((v) => !v)}
+                        onClick={() => {
+                            setReorderMode((v) => {
+                                if (!v) {
+                                    setCategoryFilter('all');
+                                    setSearch('');
+                                }
+                                return !v;
+                            });
+                        }}
                         base={{
                             ...outlineBtnToken,
                             background: reorderMode ? '#f1f5f9' : '#fff',
@@ -447,7 +481,7 @@ export default function Services() {
                             borderColor: '#cbd5e1',
                             transform: 'translateY(-1px)',
                         }}
-                        title="Reorder how services appear on customer booking page"
+                        title="Reorder services"
                     >
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -552,7 +586,7 @@ export default function Services() {
                 </div>
             </div>
 
-            {/* Category Tabs (styled identical to Bookings page tabs) */}
+            {/* Category Tabs (styled identical to Bookings page tabs, with jitter-free fixed dimensions) */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 22, flexWrap: 'wrap' }}>
                 {CATEGORY_TABS.map((tab) => {
                     const isSelected = categoryFilter === tab.key;
@@ -561,13 +595,23 @@ export default function Services() {
                             key={tab.key}
                             type="button"
                             onClick={() => setCategoryFilter(tab.key)}
-                            style={tabBtn(isSelected)}
+                            style={{
+                                ...tabBtn(isSelected),
+                                border: isSelected ? '1.5px solid transparent' : `1.5px solid ${brand.border}`,
+                                boxSizing: 'border-box',
+                                height: 38,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                whiteSpace: 'nowrap',
+                                userSelect: 'none',
+                            }}
                         >
                             {tab.label}
                             <span style={{
                                 fontSize: 10,
                                 fontWeight: 800,
-                                marginLeft: 4,
+                                marginLeft: 5,
                                 opacity: isSelected ? 0.8 : 0.5,
                             }}>
                                 {categoryCounts[tab.key] || 0}
@@ -578,7 +622,7 @@ export default function Services() {
             </div>
 
             {/* Table Container */}
-            <div style={{ ...card, overflow: 'hidden' }}>
+            <div style={{ ...card, overflow: 'hidden', minHeight: 440 }}>
                 {/* Reorder Hint */}
                 {reorderMode && (
                     <div style={{
@@ -591,7 +635,7 @@ export default function Services() {
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>Reorder mode: drag rows or use ▲ ▼ arrows. Synced directly with customer booking page.</span>
+                            <span>Reorder mode: drag rows to reorder.</span>
                         </div>
                         {reordering && <span style={{ color: '#64748b', fontSize: 11 }}>Saving order...</span>}
                     </div>
@@ -629,17 +673,16 @@ export default function Services() {
                                     svc={svc}
                                     index={index}
                                     reorderMode={reorderMode}
-                                    onDragStart={handleDragStart}
-                                    onDragEnter={handleDragEnter}
+                                    isDragging={draggingIndex === index}
+                                    transform={getRowTransform(index)}
+                                    onDragStart={(e) => handleDragStart(e, index)}
+                                    onDragEnter={(e) => handleDragEnter(e, index)}
+                                    onDragOver={(e) => handleDragOver(e, index)}
                                     onDragEnd={handleDragEnd}
                                     onView={() => setViewModal(svc)}
                                     onEdit={() => openEdit(svc)}
                                     onDelete={() => setDeleteModal(svc)}
                                     onToggle={() => handleToggle(svc)}
-                                    onMoveUp={() => moveService(index, -1)}
-                                    onMoveDown={() => moveService(index, 1)}
-                                    canMoveUp={index > 0}
-                                    canMoveDown={index < sortedServices.length - 1}
                                 />
                             );
                         })}
@@ -664,17 +707,16 @@ export default function Services() {
                                             svc={svc}
                                             index={actualIndex}
                                             reorderMode={reorderMode}
-                                            onDragStart={handleDragStart}
-                                            onDragEnter={handleDragEnter}
+                                            isDragging={draggingIndex === actualIndex}
+                                            transform={getRowTransform(actualIndex)}
+                                            onDragStart={(e) => handleDragStart(e, actualIndex)}
+                                            onDragEnter={(e) => handleDragEnter(e, actualIndex)}
+                                            onDragOver={(e) => handleDragOver(e, actualIndex)}
                                             onDragEnd={handleDragEnd}
                                             onView={() => setViewModal(svc)}
                                             onEdit={() => openEdit(svc)}
                                             onDelete={() => setDeleteModal(svc)}
                                             onToggle={() => handleToggle(svc)}
-                                            onMoveUp={() => moveService(actualIndex, -1)}
-                                            onMoveDown={() => moveService(actualIndex, 1)}
-                                            canMoveUp={actualIndex > 0}
-                                            canMoveDown={actualIndex < sortedServices.length - 1}
                                         />
                                     );
                                 })}
@@ -699,36 +741,50 @@ export default function Services() {
 /* ── Minimal Table Row ─────────────────────────────────────────── */
 function ServiceRow({
     svc, index, reorderMode,
-    onDragStart, onDragEnter, onDragEnd,
+    isDragging, transform,
+    onDragStart, onDragEnter, onDragOver, onDragEnd,
     onView, onEdit, onDelete, onToggle,
-    onMoveUp, onMoveDown, canMoveUp, canMoveDown
 }) {
     const isActive = svc.status === 'active';
 
     return (
         <div
             draggable={reorderMode}
-            onDragStart={() => onDragStart(index)}
-            onDragEnter={() => onDragEnter(index)}
+            onDragStart={onDragStart}
+            onDragEnter={onDragEnter}
+            onDragOver={onDragOver}
             onDragEnd={onDragEnd}
-            onDragOver={(e) => e.preventDefault()}
             onClick={() => !reorderMode && onView()}
             style={{
                 ...tdRow,
                 gridTemplateColumns: reorderMode
                     ? '28px 1.8fr 130px 110px 105px 92px'
                     : '1.8fr 130px 110px 105px 92px',
-                cursor: reorderMode ? 'grab' : 'pointer',
+                cursor: reorderMode ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
                 userSelect: reorderMode ? 'none' : 'auto',
-                background: !isActive ? '#fafbfc' : '#fff',
-                opacity: !isActive ? 0.78 : 1,
+                background: isDragging
+                    ? '#f0f9ff'
+                    : (!isActive ? '#fafbfc' : '#fff'),
+                opacity: isDragging ? 0.45 : (!isActive ? 0.78 : 1),
+                border: isDragging ? '1.5px dashed #0284c7' : undefined,
+                transform: reorderMode ? transform : 'none',
+                transition: reorderMode
+                    ? 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background 0.15s, opacity 0.15s'
+                    : 'background 0.15s',
+                position: 'relative',
+                zIndex: isDragging ? 10 : 1,
+                boxSizing: 'border-box',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = !isActive ? '#f1f5f9' : '#f8fafc'}
-            onMouseLeave={e => e.currentTarget.style.background = !isActive ? '#fafbfc' : '#fff'}
+            onMouseEnter={e => {
+                if (!isDragging) e.currentTarget.style.background = !isActive ? '#f1f5f9' : '#f8fafc';
+            }}
+            onMouseLeave={e => {
+                if (!isDragging) e.currentTarget.style.background = !isActive ? '#fafbfc' : '#fff';
+            }}
         >
             {/* Reorder drag handle */}
             {reorderMode && (
-                <div style={{ color: '#94a3b8', fontSize: 15, cursor: 'grab', userSelect: 'none' }} title="Drag to reorder">
+                <div style={{ color: isDragging ? '#0284c7' : '#94a3b8', fontSize: 16, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }} title="Drag to reorder">
                     ⠿
                 </div>
             )}
@@ -779,32 +835,6 @@ function ServiceRow({
                 onClick={(e) => e.stopPropagation()}
                 style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}
             >
-                {reorderMode && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginRight: 2 }}>
-                        <button
-                            type="button"
-                            onClick={onMoveUp}
-                            disabled={!canMoveUp}
-                            style={{
-                                width: 20, height: 15, borderRadius: 3, border: `1px solid ${brand.border}`,
-                                background: !canMoveUp ? '#f8fafc' : '#fff', color: !canMoveUp ? '#cbd5e1' : brand.navy,
-                                cursor: !canMoveUp ? 'default' : 'pointer', fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}
-                            title="Move up"
-                        >▲</button>
-                        <button
-                            type="button"
-                            onClick={onMoveDown}
-                            disabled={!canMoveDown}
-                            style={{
-                                width: 20, height: 15, borderRadius: 3, border: `1px solid ${brand.border}`,
-                                background: !canMoveDown ? '#f8fafc' : '#fff', color: !canMoveDown ? '#cbd5e1' : brand.navy,
-                                cursor: !canMoveDown ? 'default' : 'pointer', fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}
-                            title="Move down"
-                        >▼</button>
-                    </div>
-                )}
                 <ActionBtn title="View" onClick={onView} icon={eyeIcon} />
                 <ActionBtn title="Edit" onClick={onEdit} icon={editIcon} />
                 <ActionBtn title="Delete" danger onClick={onDelete} icon={trashIcon} />
