@@ -299,7 +299,11 @@ export default function Services() {
                 <div style={{
                     position: 'fixed', top: 24, right: 24, zIndex: 9999,
                     padding: '12px 20px', borderRadius: 12, fontSize: 13, fontWeight: 600,
-                    background: toast.type === 'success' ? 'rgba(10, 35, 66, 0.85)' : 'rgba(220, 38, 38, 0.85)',
+                    background: toast.type === 'success'
+                        ? 'rgba(10, 35, 66, 0.85)'
+                        : toast.type === 'info'
+                            ? 'rgba(15, 23, 42, 0.88)'
+                            : 'rgba(220, 38, 38, 0.85)',
                     backdropFilter: 'blur(10px)',
                     WebkitBackdropFilter: 'blur(10px)',
                     border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -308,10 +312,9 @@ export default function Services() {
                     display: 'flex', alignItems: 'center', gap: 8,
                 }}>
                     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        {toast.type === 'success'
-                            ? <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            : <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        }
+                        {toast.type === 'success' && <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />}
+                        {toast.type === 'info' && <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
+                        {toast.type === 'error' && <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />}
                     </svg>
                     {toast.msg}
                 </div>
@@ -671,7 +674,7 @@ export default function Services() {
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>Reorder mode: drag rows to reorder.</span>
+                            <span>Reorder mode</span>
                         </div>
                         {reordering && <span style={{ color: '#64748b', fontSize: 11 }}>Saving order...</span>}
                     </div>
@@ -716,6 +719,7 @@ export default function Services() {
                                     onEdit={() => openEdit(svc)}
                                     onDelete={() => setDeleteModal(svc)}
                                     onToggle={() => handleToggle(svc)}
+                                    onActionBlocked={() => showToast("Please press 'Done Reordering' first.", 'info')}
                                 />
                             );
                         })}
@@ -730,7 +734,7 @@ export default function Services() {
                                     display: 'flex', alignItems: 'center', gap: 6,
                                 }}>
                                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#94a3b8' }} />
-                                    <span>Inactive Services ({inactiveServices.length})</span>
+                                    <span>Inactive Services</span>
                                 </div>
                                 {inactiveServices.map((svc, index) => {
                                     const actualIndex = activeServices.length + index;
@@ -747,6 +751,7 @@ export default function Services() {
                                             onEdit={() => openEdit(svc)}
                                             onDelete={() => setDeleteModal(svc)}
                                             onToggle={() => handleToggle(svc)}
+                                            onActionBlocked={() => showToast("Please press 'Done Reordering' first.", 'info')}
                                         />
                                     );
                                 })}
@@ -774,8 +779,10 @@ function ServiceRow({
     isDragging, transform,
     onPointerDown,
     onView, onEdit, onDelete, onToggle,
+    onActionBlocked,
 }) {
     const isActive = svc.status === 'active';
+    const hasTransform = reorderMode && transform && transform !== 'none' && transform !== 'translateY(0px)';
 
     return (
         <div
@@ -804,7 +811,7 @@ function ServiceRow({
                 transform: reorderMode ? transform : 'none',
                 transition: isDragging
                     ? 'none'
-                    : (reorderMode ? 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background 0.15s' : 'background 0.15s'),
+                    : (hasTransform ? 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background 0.15s' : 'background 0.15s'),
                 position: 'relative',
                 zIndex: isDragging ? 50 : 1,
                 boxSizing: 'border-box',
@@ -856,16 +863,24 @@ function ServiceRow({
             <div onClick={(e) => e.stopPropagation()}>
                 <button
                     type="button"
-                    onClick={onToggle}
+                    onClick={() => {
+                        if (reorderMode) {
+                            onActionBlocked();
+                            return;
+                        }
+                        onToggle();
+                    }}
                     style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6,
                         padding: '3px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 600,
                         border: `1px solid ${isActive ? '#dcfce7' : '#e2e8f0'}`,
                         background: isActive ? '#f0fdf4' : '#f8fafc',
                         color: isActive ? '#166534' : '#64748b',
-                        cursor: 'pointer', transition: 'all 0.15s',
+                        cursor: reorderMode ? 'not-allowed' : 'pointer',
+                        opacity: reorderMode ? 0.45 : 1,
+                        transition: 'all 0.15s',
                     }}
-                    title="Click to toggle active/inactive status"
+                    title={reorderMode ? "Press 'Done Reordering' first" : "Click to toggle active/inactive status"}
                 >
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: isActive ? '#16a34a' : '#94a3b8' }} />
                     {isActive ? 'Active' : 'Inactive'}
@@ -877,9 +892,43 @@ function ServiceRow({
                 onClick={(e) => e.stopPropagation()}
                 style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}
             >
-                <ActionBtn title="View" onClick={onView} icon={eyeIcon} />
-                <ActionBtn title="Edit" onClick={onEdit} icon={editIcon} />
-                <ActionBtn title="Delete" danger onClick={onDelete} icon={trashIcon} />
+                <ActionBtn
+                    title="View"
+                    onClick={() => {
+                        if (reorderMode) {
+                            onActionBlocked();
+                            return;
+                        }
+                        onView();
+                    }}
+                    icon={eyeIcon}
+                    disabled={reorderMode}
+                />
+                <ActionBtn
+                    title="Edit"
+                    onClick={() => {
+                        if (reorderMode) {
+                            onActionBlocked();
+                            return;
+                        }
+                        onEdit();
+                    }}
+                    icon={editIcon}
+                    disabled={reorderMode}
+                />
+                <ActionBtn
+                    title="Delete"
+                    danger
+                    onClick={() => {
+                        if (reorderMode) {
+                            onActionBlocked();
+                            return;
+                        }
+                        onDelete();
+                    }}
+                    icon={trashIcon}
+                    disabled={reorderMode}
+                />
             </div>
         </div>
     );
@@ -970,7 +1019,7 @@ function HoverBtn({ children, onClick, base, hoverStyle, type = 'button', disabl
     );
 }
 
-function ActionBtn({ title, onClick, icon, danger }) {
+function ActionBtn({ title, onClick, icon, danger, disabled }) {
     const [hovered, setHovered] = useState(false);
     const isView = title === 'View';
     const bgHover = danger ? '#fef2f2' : isView ? '#f1f5f9' : '#f1f5f9';
@@ -978,19 +1027,21 @@ function ActionBtn({ title, onClick, icon, danger }) {
     const textHover = danger ? '#dc2626' : brand.navy;
     return (
         <button
-            title={title}
+            title={disabled ? "Press 'Done Reordering' first" : title}
             onClick={onClick}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             style={{
                 width: 28, height: 28, borderRadius: 8,
-                border: `1.5px solid ${hovered ? borderHover : brand.border}`,
-                background: hovered ? bgHover : '#fff',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: hovered ? textHover : '#64748b',
+                border: `1.5px solid ${!disabled && hovered ? borderHover : brand.border}`,
+                background: !disabled && hovered ? bgHover : '#fff',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: disabled ? 0.45 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: !disabled && hovered ? textHover : '#64748b',
                 transition: 'all 0.15s',
-                transform: hovered ? 'translateY(-1px)' : 'none',
-                boxShadow: hovered ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+                transform: !disabled && hovered ? 'translateY(-1px)' : 'none',
+                boxShadow: !disabled && hovered ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
             }}
         >{icon}</button>
     );
