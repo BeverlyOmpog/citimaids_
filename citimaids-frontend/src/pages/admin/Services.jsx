@@ -1,32 +1,39 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import api from '../../api/axios';
 import { brand, fonts, pageTitle, pageSubtitle, card, solidBtn as solidBtnToken, outlineBtn as outlineBtnToken, statusBadge, inputStyle as inputStyleToken, selectStyle as selectStyleToken } from './adminStyles';
 
-const serviceColors = {
-    'Home Cleaning': '#059669',
-    'Office Cleaning': '#2563eb',
-    'Villa Cleaning': '#7c3aed',
-    'Deep Cleaning': '#d97706',
-    'Carpet & Sofa Cleaning': '#ec4899',
-    'Window & Glass Cleaning': '#0891b2',
-    'Move-in / Move-out Cleaning': '#dc2626',
+const CATEGORY_CONFIG = {
+    residential: { label: 'Residential', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+    commercial:  { label: 'Commercial', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+    specialized: { label: 'Specialized & Deep Care', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+    maintenance: { label: 'Outdoor & Maintenance', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
 };
 
-/* SVG icon generator per service name */
-function ServiceIcon({ name, size = 20 }) {
-    const icons = {
-        'Home Cleaning': <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />,
-        'Office Cleaning': <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />,
-        'Villa Cleaning': <><path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M9 21V8l3-5 3 5v13M5 21V14l4-3M19 21V14l-4-3" /></>,
-        'Deep Cleaning': <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />,
-        'Carpet & Sofa Cleaning': <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4-8h8l4 8M6 16h12M8 20H4v-4M16 20h4v-4" />,
-        'Window & Glass Cleaning': <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 3v18M3 12h18" /></>,
-        'Move-in / Move-out Cleaning': <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />,
-    };
+const letterColors = {
+    A: '#2563eb', B: '#ec4899', C: '#7c3aed', D: '#d97706', E: '#059669',
+    F: '#0891b2', G: '#059669', H: '#2563eb', I: '#7c3aed', J: '#d97706',
+    K: '#ec4899', L: '#0891b2', M: '#dc2626', N: '#2563eb', O: '#2563eb',
+    P: '#7c3aed', Q: '#059669', R: '#059669', S: '#ec4899', T: '#d97706',
+    U: '#0891b2', V: '#7c3aed', W: '#0891b2', X: '#64748b', Y: '#d97706', Z: '#2563eb'
+};
+
+/* Avatar badge showing starting letter of service */
+function ServiceLetterAvatar({ name, size = 40 }) {
+    const letter = (name || 'S').trim().charAt(0).toUpperCase();
+    const color = letterColors[letter] || '#2563eb';
     return (
-        <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-            {icons[name] || <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />}
-        </svg>
+        <div style={{
+            width: size, height: size, borderRadius: 12,
+            background: `${color}15`, color: color,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 800, fontSize: Math.round(size * 0.44),
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            border: `1.5px solid ${color}35`,
+            flexShrink: 0,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+        }}>
+            {letter}
+        </div>
     );
 }
 
@@ -35,8 +42,9 @@ export default function Services() {
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
     const [deleteModal, setDeleteModal] = useState(null);
+    const [viewModal, setViewModal] = useState(null);
     const [formModal, setFormModal] = useState(null);
-    const [form, setForm] = useState({ name: '', description: '', base_price: '', status: 'active' });
+    const [form, setForm] = useState({ name: '', category: 'residential', description: '', base_price: '', status: 'active' });
     const [formLoading, setFormLoading] = useState(false);
     const [reorderMode, setReorderMode] = useState(false);
     const [reordering, setReordering] = useState(false);
@@ -57,13 +65,29 @@ export default function Services() {
         }
     };
 
+    // Sort services so active ones are on top (ordered by display_order) and inactive sit at the bottom
+    const sortedServices = useMemo(() => {
+        return [...services].sort((a, b) => {
+            const aActive = a.status === 'active' ? 0 : 1;
+            const bActive = b.status === 'active' ? 0 : 1;
+            if (aActive !== bActive) return aActive - bActive;
+            return (a.display_order || 0) - (b.display_order || 0);
+        });
+    }, [services]);
+
     const openAdd = () => {
-        setForm({ name: '', description: '', base_price: '', status: 'active' });
+        setForm({ name: '', category: 'residential', description: '', base_price: '', status: 'active' });
         setFormModal('add');
     };
 
     const openEdit = (svc) => {
-        setForm({ name: svc.name, description: svc.description || '', base_price: svc.base_price || '', status: svc.status });
+        setForm({
+            name: svc.name,
+            category: svc.category || 'residential',
+            description: svc.description || '',
+            base_price: svc.base_price || '',
+            status: svc.status || 'active'
+        });
         setFormModal(svc);
     };
 
@@ -109,7 +133,7 @@ export default function Services() {
         }
     };
 
-    // ── Drag-and-drop reorder handlers ──────────────────────────────────────
+    // ── Drag-and-drop & Step reorder handlers ──────────────────────────────
     const handleDragStart = (index) => { dragItem.current = index; };
     const handleDragEnter = (index) => { dragOverItem.current = index; };
 
@@ -121,24 +145,36 @@ export default function Services() {
             dragOverItem.current = null;
             return;
         }
-        // Optimistic local reorder
-        const reordered = [...services];
+        const reordered = [...sortedServices];
         const [moved] = reordered.splice(from, 1);
         reordered.splice(to, 0, moved);
         setServices(reordered);
         dragItem.current = null;
         dragOverItem.current = null;
 
-        // Persist to backend
+        await persistReorder(reordered);
+    };
+
+    const moveService = async (index, direction) => {
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= sortedServices.length) return;
+        const reordered = [...sortedServices];
+        const [moved] = reordered.splice(index, 1);
+        reordered.splice(targetIndex, 0, moved);
+        setServices(reordered);
+        await persistReorder(reordered);
+    };
+
+    const persistReorder = async (reordered) => {
         setReordering(true);
         try {
             await api.post('/services/reorder', {
                 order: reordered.map((s) => ({ id: s.id })),
             });
-            showToast('Service order saved.', 'success');
+            showToast('Service order saved and synced with customer booking.', 'success');
         } catch {
             showToast('Failed to save order — please refresh.', 'error');
-            fetchServices(); // revert
+            fetchServices();
         } finally {
             setReordering(false);
         }
@@ -175,6 +211,95 @@ export default function Services() {
                 </div>
             )}
 
+            {/* View Modal */}
+            {viewModal && (
+                <Overlay onClose={() => setViewModal(null)} title="Service Overview">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <ServiceLetterAvatar name={viewModal.name} size={48} />
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: brand.navy }}>{viewModal.name}</div>
+                                <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <span style={{
+                                        fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                                        background: (CATEGORY_CONFIG[viewModal.category] || CATEGORY_CONFIG.residential).bg,
+                                        color: (CATEGORY_CONFIG[viewModal.category] || CATEGORY_CONFIG.residential).color,
+                                        border: `1px solid ${(CATEGORY_CONFIG[viewModal.category] || CATEGORY_CONFIG.residential).border}`,
+                                        textTransform: 'uppercase', letterSpacing: 0.6,
+                                    }}>
+                                        {(CATEGORY_CONFIG[viewModal.category] || CATEGORY_CONFIG.residential).label}
+                                    </span>
+                                    <span style={statusBadge(viewModal.status)}>
+                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
+                                        {viewModal.status === 'active' ? 'Active' : 'Inactive'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Metric Cards */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <div style={{ padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Base Rate</div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: '#2563eb', marginTop: 2 }}>AED {Number(viewModal.base_price || 0).toFixed(2)}</div>
+                            </div>
+                            <div style={{ padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Booking Order</div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: brand.navy, marginTop: 2 }}>#{viewModal.display_order || '—'}</div>
+                            </div>
+                            <div style={{ padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Total Bookings</div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: brand.navy, marginTop: 2 }}>{viewModal.bookings_count || 0}</div>
+                            </div>
+                            <div style={{ padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Total Revenue</div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: brand.navy, marginTop: 2 }}>AED {Number(viewModal.total_revenue || ((viewModal.bookings_count || 0) * (viewModal.base_price || 0))).toLocaleString()}</div>
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Description</div>
+                            <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.6, padding: '12px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${brand.border}` }}>
+                                {viewModal.description || 'No description provided.'}
+                            </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+                            <HoverBtn
+                                onClick={() => {
+                                    const target = viewModal;
+                                    setViewModal(null);
+                                    openEdit(target);
+                                }}
+                                base={{ ...outlineBtnToken, flex: 1, justifyContent: 'center' }}
+                                hoverStyle={{ background: '#f1f5f9', borderColor: '#cbd5e1', color: brand.navy, transform: 'translateY(-1px)' }}
+                            >
+                                Edit Service
+                            </HoverBtn>
+                            <HoverBtn
+                                onClick={() => {
+                                    handleToggle(viewModal);
+                                    setViewModal(null);
+                                }}
+                                base={{ ...outlineBtnToken, flex: 1, justifyContent: 'center', borderColor: viewModal.status === 'active' ? '#fca5a5' : '#86efac', color: viewModal.status === 'active' ? '#dc2626' : '#059669' }}
+                                hoverStyle={{ background: viewModal.status === 'active' ? '#fef2f2' : '#ecfdf5', transform: 'translateY(-1px)' }}
+                            >
+                                {viewModal.status === 'active' ? 'Deactivate' : 'Activate'}
+                            </HoverBtn>
+                            <HoverBtn
+                                onClick={() => setViewModal(null)}
+                                base={{ ...solidBtnToken, flex: 1, justifyContent: 'center' }}
+                                hoverStyle={{ opacity: 0.88, transform: 'translateY(-1px)', boxShadow: '0 6px 18px rgba(10,35,66,0.3)' }}
+                            >
+                                Close
+                            </HoverBtn>
+                        </div>
+                    </div>
+                </Overlay>
+            )}
+
             {/* Delete Modal */}
             {deleteModal && (
                 <Overlay onClose={() => setDeleteModal(null)}>
@@ -193,8 +318,8 @@ export default function Services() {
                             Are you sure you want to delete <strong>{deleteModal.name}</strong>?
                         </p>
                         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-                            <button onClick={() => setDeleteModal(null)} style={outlineBtnToken}>Cancel</button>
-                            <button onClick={handleDelete} style={{ ...solidBtnToken, background: '#dc2626', boxShadow: '0 4px 12px rgba(220,38,38,0.25)' }}>Delete</button>
+                            <HoverBtn onClick={() => setDeleteModal(null)} base={outlineBtnToken} hoverStyle={{ background: '#f1f5f9', borderColor: '#cbd5e1', color: brand.navy }}>Cancel</HoverBtn>
+                            <HoverBtn onClick={handleDelete} base={{ ...solidBtnToken, background: '#dc2626' }} hoverStyle={{ opacity: 0.9, transform: 'translateY(-1px)', boxShadow: '0 4px 14px rgba(220,38,38,0.3)' }}>Delete</HoverBtn>
                         </div>
                     </div>
                 </Overlay>
@@ -208,13 +333,21 @@ export default function Services() {
                             <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                                 placeholder="e.g. Home Cleaning" style={inputStyleToken} />
                         </FieldGroup>
+                        <FieldGroup label="Category" required>
+                            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={selectStyleToken}>
+                                <option value="residential">Residential</option>
+                                <option value="commercial">Commercial</option>
+                                <option value="specialized">Specialized & Deep Care</option>
+                                <option value="maintenance">Outdoor & Maintenance</option>
+                            </select>
+                        </FieldGroup>
                         <FieldGroup label="Description">
                             <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
                                 placeholder="Brief description of this service..." rows={3}
                                 style={{ ...inputStyleToken, resize: 'vertical', fontFamily: 'inherit' }} />
                         </FieldGroup>
                         <FieldGroup label="Base Price (AED)">
-                            <input type="number" value={form.base_price} onChange={e => setForm({ ...form, base_price: e.target.value })}
+                            <input type="number" step="0.5" value={form.base_price} onChange={e => setForm({ ...form, base_price: e.target.value })}
                                 placeholder="0.00" style={inputStyleToken} />
                         </FieldGroup>
                         <FieldGroup label="Status">
@@ -224,10 +357,10 @@ export default function Services() {
                             </select>
                         </FieldGroup>
                         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                            <button type="button" onClick={() => setFormModal(null)} style={{ ...outlineBtnToken, flex: 1, justifyContent: 'center' }}>Cancel</button>
-                            <button type="submit" disabled={formLoading} style={{ ...solidBtnToken, flex: 1, justifyContent: 'center', opacity: formLoading ? 0.6 : 1 }}>
+                            <HoverBtn type="button" onClick={() => setFormModal(null)} base={{ ...outlineBtnToken, flex: 1, justifyContent: 'center' }} hoverStyle={{ background: '#f1f5f9', borderColor: '#cbd5e1', color: brand.navy }}>Cancel</HoverBtn>
+                            <HoverBtn type="submit" disabled={formLoading} base={{ ...solidBtnToken, flex: 1, justifyContent: 'center', opacity: formLoading ? 0.6 : 1 }} hoverStyle={{ opacity: 0.88, transform: 'translateY(-1px)', boxShadow: '0 6px 18px rgba(10,35,66,0.3)' }}>
                                 {formLoading ? 'Saving...' : 'Save Service'}
-                            </button>
+                            </HoverBtn>
                         </div>
                     </form>
                 </Overlay>
@@ -237,31 +370,41 @@ export default function Services() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
                 <div>
                     <h1 style={pageTitle}>Services</h1>
-                    <p style={pageSubtitle}>Manage cleaning services and pricing</p>
+                    <p style={pageSubtitle}>Manage cleaning services, categories, and customer booking order</p>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
-                    <button
+                    <HoverBtn
                         onClick={() => setReorderMode((v) => !v)}
-                        style={{
+                        base={{
                             ...outlineBtnToken,
                             background: reorderMode ? '#eff6ff' : '#fff',
                             borderColor: reorderMode ? '#2563eb' : brand.border,
                             color: reorderMode ? '#2563eb' : '#334155',
                         }}
-                        title="Drag rows to reorder how services appear on the booking page"
+                        hoverStyle={{
+                            background: reorderMode ? '#dbeafe' : '#eff6ff',
+                            borderColor: '#93c5fd',
+                            color: '#1d4ed8',
+                            transform: 'translateY(-1px)',
+                        }}
+                        title="Reorder how services appear on customer booking page"
                     >
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
-                        {reorderMode ? 'Exit Reorder' : 'Reorder Services'}
+                        {reorderMode ? 'Done Reordering' : 'Reorder Services'}
                         {reordering && <span style={{ marginLeft: 6, fontSize: 11, color: '#94a3b8' }}>Saving...</span>}
-                    </button>
-                    <button onClick={openAdd} style={solidBtnToken}>
+                    </HoverBtn>
+                    <HoverBtn
+                        onClick={openAdd}
+                        base={solidBtnToken}
+                        hoverStyle={{ opacity: 0.88, transform: 'translateY(-1px)', boxShadow: '0 6px 20px rgba(10,35,66,0.30)' }}
+                    >
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                         </svg>
                         Add Service
-                    </button>
+                    </HoverBtn>
                 </div>
             </div>
 
@@ -289,20 +432,30 @@ export default function Services() {
                 {/* Reorder hint banner */}
                 {reorderMode && (
                     <div style={{
-                        padding: '10px 24px', background: '#eff6ff',
+                        padding: '12px 24px', background: '#eff6ff',
                         borderBottom: `1px solid ${brand.border}`,
                         fontSize: 12, color: '#2563eb', fontWeight: 600,
-                        display: 'flex', alignItems: 'center', gap: 8,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                     }}>
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Drag the ⠿ handle on any row to reorder services. Changes save automatically and reflect on the booking page.
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Drag the <strong>⠿</strong> handle or use <strong>▲ ▼</strong> to reorder. Services display in customer booking 2-column layout (left-to-right / row by row) in this exact order. Inactive services remain at the bottom.</span>
+                        </div>
+                        {reordering && <span style={{ color: '#1e40af', fontWeight: 700 }}>Saving order...</span>}
                     </div>
                 )}
-                <div style={{ ...thRow, gridTemplateColumns: reorderMode ? '32px 1.8fr 2fr 140px 120px 110px 100px' : '1.8fr 2fr 140px 120px 110px 100px' }}>
+
+                <div style={{
+                    ...thRow,
+                    gridTemplateColumns: reorderMode
+                        ? '32px 1.6fr 130px 1.8fr 110px 110px 100px 110px'
+                        : '1.6fr 130px 1.8fr 110px 110px 100px 110px',
+                }}>
                     {reorderMode && <span />}
                     <Th>SERVICE</Th>
+                    <Th>CATEGORY</Th>
                     <Th>DESCRIPTION</Th>
                     <Th>BOOKINGS</Th>
                     <Th>REVENUE</Th>
@@ -312,7 +465,7 @@ export default function Services() {
 
                 {loading ? (
                     <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8', fontSize: 14 }}>Loading services...</div>
-                ) : services.length === 0 ? (
+                ) : sortedServices.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 60 }}>
                         <div style={{
                             width: 48, height: 48, borderRadius: '50%', background: '#eff6ff',
@@ -327,12 +480,12 @@ export default function Services() {
                         <div style={{ color: '#64748b', fontSize: 13 }}>Add your first cleaning service to get started.</div>
                     </div>
                 ) : (
-                    services.map((svc, index) => {
-                        const color = serviceColors[svc.name] || '#6366f1';
+                    sortedServices.map((svc, index) => {
                         const bookings = svc.bookings_count || 0;
                         const revenue = svc.total_revenue || (bookings * (svc.base_price || 0));
                         const barPct = Math.round((bookings / maxBookings) * 100);
                         const isActive = svc.status === 'active';
+                        const catConfig = CATEGORY_CONFIG[svc.category] || CATEGORY_CONFIG.residential;
 
                         return (
                             <div
@@ -344,12 +497,16 @@ export default function Services() {
                                 onDragOver={(e) => e.preventDefault()}
                                 style={{
                                     ...tdRow,
-                                    gridTemplateColumns: reorderMode ? '32px 1.8fr 2fr 140px 120px 110px 100px' : '1.8fr 2fr 140px 120px 110px 100px',
+                                    gridTemplateColumns: reorderMode
+                                        ? '32px 1.6fr 130px 1.8fr 110px 110px 100px 110px'
+                                        : '1.6fr 130px 1.8fr 110px 110px 100px 110px',
                                     cursor: reorderMode ? 'grab' : 'default',
                                     userSelect: reorderMode ? 'none' : 'auto',
+                                    background: !isActive ? '#fafbfc' : '#fff',
+                                    opacity: !isActive ? 0.85 : 1,
                                 }}
-                                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                                onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                                onMouseEnter={e => e.currentTarget.style.background = !isActive ? '#f1f5f9' : '#f8fafc'}
+                                onMouseLeave={e => e.currentTarget.style.background = !isActive ? '#fafbfc' : '#fff'}>
 
                                 {/* Drag handle */}
                                 {reorderMode && (
@@ -360,43 +517,89 @@ export default function Services() {
                                     }} title="Drag to reorder">⠿</div>
                                 )}
 
+                                {/* Service Letter Avatar & Name */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    <div style={{
-                                        width: 42, height: 42, borderRadius: 12,
-                                        background: `${color}15`, color: color,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    }}><ServiceIcon name={svc.name} /></div>
+                                    <ServiceLetterAvatar name={svc.name} size={42} />
                                     <div>
-                                        <div style={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>{svc.name}</div>
-                                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
-                                            SVC-{String(svc.id).padStart(3, '0')} · AED {Number(svc.base_price || 0).toFixed(2)} · Order #{svc.display_order || index + 1}
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: brand.navy }}>{svc.name}</div>
+                                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>
+                                            SVC-{String(svc.id).padStart(3, '0')} · <span style={{ color: '#2563eb', fontWeight: 700 }}>AED {Number(svc.base_price || 0).toFixed(2)}</span> · Order #{svc.display_order || index + 1}
                                         </div>
                                     </div>
                                 </div>
-                                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5, paddingRight: 12 }}>
+
+                                {/* Category Badge */}
+                                <div>
+                                    <span style={{
+                                        display: 'inline-block',
+                                        fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 6,
+                                        background: catConfig.bg, color: catConfig.color, border: `1px solid ${catConfig.border}`,
+                                        textTransform: 'uppercase', letterSpacing: 0.6,
+                                    }}>
+                                        {catConfig.label}
+                                    </span>
+                                </div>
+
+                                {/* Description */}
+                                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.45, paddingRight: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                                     {svc.description || '—'}
                                 </div>
+
+                                {/* Bookings */}
                                 <div>
                                     <div style={{ height: 6, background: '#e2e8f0', borderRadius: 4, width: '80%', marginBottom: 4, overflow: 'hidden' }}>
-                                        <div style={{ height: '100%', width: `${barPct}%`, background: color, borderRadius: 4, transition: 'width 0.3s' }} />
+                                        <div style={{ height: '100%', width: `${barPct}%`, background: catConfig.color, borderRadius: 4, transition: 'width 0.3s' }} />
                                     </div>
                                     <span style={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>{bookings}</span>
                                 </div>
+
+                                {/* Revenue */}
                                 <div style={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>
                                     AED {Number(revenue).toLocaleString()}
                                 </div>
+
+                                {/* Status */}
                                 <button
                                     onClick={() => handleToggle(svc)}
                                     style={{
                                         ...statusBadge(isActive ? 'active' : 'inactive'),
-                                        border: 'none', cursor: 'pointer',
+                                        border: 'none', cursor: 'pointer', transition: 'all 0.15s',
                                     }}
+                                    title="Click to toggle active/inactive status"
                                 >
                                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
                                     {isActive ? 'Active' : 'Inactive'}
                                 </button>
-                                <div style={{ display: 'flex', gap: 6 }}>
-                                    <ActionBtn title="View" icon={eyeIcon} />
+
+                                {/* Actions + Up/Down in reorder mode */}
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                    {reorderMode && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginRight: 2 }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => moveService(index, -1)}
+                                                disabled={index === 0}
+                                                style={{
+                                                    width: 22, height: 16, borderRadius: 4, border: `1px solid ${brand.border}`,
+                                                    background: index === 0 ? '#f8fafc' : '#fff', color: index === 0 ? '#cbd5e1' : brand.navy,
+                                                    cursor: index === 0 ? 'default' : 'pointer', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}
+                                                title="Move up"
+                                            >▲</button>
+                                            <button
+                                                type="button"
+                                                onClick={() => moveService(index, 1)}
+                                                disabled={index === sortedServices.length - 1}
+                                                style={{
+                                                    width: 22, height: 16, borderRadius: 4, border: `1px solid ${brand.border}`,
+                                                    background: index === sortedServices.length - 1 ? '#f8fafc' : '#fff', color: index === sortedServices.length - 1 ? '#cbd5e1' : brand.navy,
+                                                    cursor: index === sortedServices.length - 1 ? 'default' : 'pointer', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}
+                                                title="Move down"
+                                            >▼</button>
+                                        </div>
+                                    )}
+                                    <ActionBtn title="View" onClick={() => setViewModal(svc)} icon={eyeIcon} />
                                     <ActionBtn title="Edit" onClick={() => openEdit(svc)} icon={editIcon} />
                                     <ActionBtn title="Delete" danger onClick={() => setDeleteModal(svc)} icon={trashIcon} />
                                 </div>
@@ -405,15 +608,18 @@ export default function Services() {
                     })
                 )}
 
-                <div style={{ padding: '14px 24px', borderTop: `1px solid ${brand.border}`, fontSize: 13, color: '#64748b' }}>
-                    Showing 1–{services.length} of {services.length} services
+                <div style={{ padding: '14px 24px', borderTop: `1px solid ${brand.border}`, fontSize: 13, color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Showing 1–{services.length} of {services.length} services</span>
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                        {activeSvcs} active on customer booking · {services.length - activeSvcs} inactive (at bottom)
+                    </span>
                 </div>
             </div>
         </div>
     );
 }
 
-/* ── Sub-components ─────────────────────────────── */
+/* ── Sub-components with matching hover tokens ─────────────────── */
 
 function SummaryCard({ icon, label, value, color }) {
     return (
@@ -434,8 +640,8 @@ function Overlay({ children, onClose, title }) {
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(6,20,41,0.55)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={e => e.target === e.currentTarget && onClose()}>
-            <div style={{ background: '#fff', borderRadius: 20, padding: 32, width: 440, maxWidth: '90vw', boxShadow: '0 25px 60px rgba(10,35,66,0.2)' }}>
-                {title && <h3 style={{ margin: '0 0 22px', fontSize: 20, fontWeight: 800, color: brand.navy, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</h3>}
+            <div style={{ background: '#fff', borderRadius: 20, padding: 32, width: 460, maxWidth: '92vw', boxShadow: '0 25px 60px rgba(10,35,66,0.2)' }}>
+                {title && <h3 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 800, color: brand.navy, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{title}</h3>}
                 {children}
             </div>
         </div>
@@ -457,23 +663,56 @@ function Th({ children }) {
     return <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.8 }}>{children}</span>;
 }
 
-function ActionBtn({ title, onClick, icon, danger }) {
+function HoverBtn({ children, onClick, base, hoverStyle, type = 'button', disabled = false, title }) {
+    const [hovered, setHovered] = useState(false);
     return (
-        <button title={title} onClick={onClick} style={{
-            width: 32, height: 32, borderRadius: 10, border: `1.5px solid ${brand.border}`, background: '#fff',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: danger ? '#dc2626' : '#64748b', transition: 'all 0.15s',
-        }}>{icon}</button>
+        <button
+            type={type}
+            title={title}
+            disabled={disabled}
+            onClick={onClick}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{ ...base, ...(hovered && !disabled ? hoverStyle : {}), transition: 'all 0.15s' }}
+        >
+            {children}
+        </button>
+    );
+}
+
+function ActionBtn({ title, onClick, icon, danger }) {
+    const [hovered, setHovered] = useState(false);
+    const isView = title === 'View';
+    const bgHover = danger ? '#fef2f2' : isView ? '#eff6ff' : '#f1f5f9';
+    const borderHover = danger ? '#fecaca' : isView ? '#bfdbfe' : '#cbd5e1';
+    const textHover = danger ? '#dc2626' : isView ? '#2563eb' : brand.navy;
+    return (
+        <button
+            title={title}
+            onClick={onClick}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{
+                width: 32, height: 32, borderRadius: 10,
+                border: `1.5px solid ${hovered ? borderHover : brand.border}`,
+                background: hovered ? bgHover : '#fff',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: hovered ? textHover : '#64748b',
+                transition: 'all 0.15s',
+                transform: hovered ? 'translateY(-1px)' : 'none',
+                boxShadow: hovered ? '0 4px 10px rgba(0,0,0,0.06)' : 'none',
+            }}
+        >{icon}</button>
     );
 }
 
 const thRow = {
-    display: 'grid', gridTemplateColumns: '1.8fr 2fr 140px 120px 110px 100px',
+    display: 'grid',
     padding: '14px 24px', borderBottom: `1px solid ${brand.border}`, background: brand.softBg,
     alignItems: 'center', gap: 12,
 };
 const tdRow = {
-    display: 'grid', gridTemplateColumns: '1.8fr 2fr 140px 120px 110px 100px',
+    display: 'grid',
     padding: '16px 24px', borderBottom: '1px solid #f1f5f9',
     alignItems: 'center', gap: 12, transition: 'background 0.15s',
 };

@@ -33,6 +33,7 @@ class ServiceController extends Controller
     public function adminIndex(Request $request)
     {
         $services = Service::withCount('bookings')
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
             ->orderBy('display_order')
             ->get();
 
@@ -43,12 +44,17 @@ class ServiceController extends Controller
     {
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
+            'category'      => 'nullable|string|max:50',
             'description'   => 'nullable|string',
             'base_price'    => 'nullable|numeric|min:0',
             'icon'          => 'nullable|string|max:100',
             'status'        => 'in:active,inactive',
             'display_order' => 'nullable|integer|min:1',
         ]);
+
+        if (empty($validated['category'])) {
+            $validated['category'] = 'residential';
+        }
 
         // Auto-assign display_order to end if not provided
         if (empty($validated['display_order'])) {
@@ -66,6 +72,7 @@ class ServiceController extends Controller
 
         $validated = $request->validate([
             'name'          => 'sometimes|string|max:255',
+            'category'      => 'nullable|string|max:50',
             'description'   => 'nullable|string',
             'base_price'    => 'nullable|numeric|min:0',
             'icon'          => 'nullable|string|max:100',
