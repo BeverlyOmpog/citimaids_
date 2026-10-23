@@ -10,7 +10,7 @@ class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = User::firstOrCreate(
+        User::updateOrCreate(
             ['email' => 'admin@citimaids.com'],
             [
                 'name'     => 'Admin',
@@ -18,11 +18,5 @@ class AdminSeeder extends Seeder
                 'role'     => 'admin',
             ]
         );
-
-        // Force-update the password in case the record already existed with a plain-text password
-        if (!password_get_info($admin->password)['algoName'] || $admin->password === 'Citimaids@admin!$123') {
-            $admin->password = Hash::make('Citimaids@admin!$123');
-            $admin->save();
-        }
     }
 }
