@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Reveal from '../components/Reveal';
+import { useServices } from '../hooks/useServices';
 
-const maintenanceServices = [
+const defaultMaintenanceServices = [
   {
     id: 'landscape',
     title: 'Landscape Contractor',
@@ -15,7 +17,7 @@ const maintenanceServices = [
       'Outdoor paving, pergolas & lighting',
       'Seasonal plant health rejuvenation',
     ],
-    imageId: '1416879595882-3373a0480b5b',
+    image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=800&h=600&fit=crop&auto=format',
   },
   {
     id: 'garden',
@@ -30,7 +32,7 @@ const maintenanceServices = [
       'Soil nutrient enrichment & mulching',
       'Irrigation system flow monitoring',
     ],
-    imageId: '1585320806297-9794b3e4eeae',
+    image: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=800&h=600&fit=crop&auto=format',
   },
   {
     id: 'pool',
@@ -45,11 +47,33 @@ const maintenanceServices = [
       'Algae eradication & water clarifying',
       'Pump, timer & light safety inspection',
     ],
-    imageId: '1575429198097-0414ec08e8cd',
+    image: 'https://images.unsplash.com/photo-1575429198097-0414ec08e8cd?w=800&h=600&fit=crop&auto=format',
   },
 ];
 
 export default function MaintenancePage() {
+  const { services, loading } = useServices();
+
+  const maintenanceList = useMemo(() => {
+    const fromApi = services.filter((s) => s.category === 'maintenance');
+    if (fromApi.length > 0) {
+      return fromApi.map((s) => ({
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        rate: s.startingPrice,
+        features: (s.included && s.included.length > 0) ? s.included : [
+          'Site inspection & assessment',
+          'Professional eco-friendly materials',
+          'Regular scheduled quality checks',
+          'Trained and certified specialists',
+        ],
+        image: s.image || 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=800&h=600&fit=crop&auto=format',
+      }));
+    }
+    return defaultMaintenanceServices;
+  }, [services]);
+
   return (
     <div>
       {/* Header */}
@@ -71,17 +95,16 @@ export default function MaintenancePage() {
       {/* Services List */}
       <section className="py-16 bg-slate-50">
         <div className="max-w-7xl mx-auto px-6 space-y-12">
-          {maintenanceServices.map((s, i) => (
+          {maintenanceList.map((s, i) => (
             <Reveal key={s.id} delay={i * 80} direction={i % 2 === 0 ? 'left' : 'right'}>
               <div
-                className={`bg-white rounded-2xl overflow-hidden grid md:grid-cols-2 border border-slate-100 ${
-                  i % 2 === 1 ? 'md:grid-flow-dense' : ''
-                }`}
+                className={`bg-white rounded-2xl overflow-hidden grid md:grid-cols-2 border border-slate-100 ${i % 2 === 1 ? 'md:grid-flow-dense' : ''
+                  }`}
                 style={{ boxShadow: '0 4px 24px rgba(10,35,66,0.06)' }}
               >
                 <div className={`h-64 md:h-auto bg-slate-100 overflow-hidden ${i % 2 === 1 ? 'md:col-start-2' : ''}`}>
                   <img
-                    src={`https://images.unsplash.com/photo-${s.imageId}?w=800&h=600&fit=crop&auto=format`}
+                    src={s.image}
                     alt={s.title}
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -91,7 +114,14 @@ export default function MaintenancePage() {
                   />
                 </div>
                 <div className="p-8 md:p-12 flex flex-col justify-center">
-                  <span className="text-xs font-bold text-blue-800 uppercase tracking-widest mb-2">Outdoor Excellence</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-blue-800 uppercase tracking-widest">Outdoor Excellence</span>
+                    {s.rate && (
+                      <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                        {s.rate}
+                      </span>
+                    )}
+                  </div>
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-4">{s.title}</h2>
                   <p className="text-slate-600 leading-relaxed mb-6 text-sm">{s.description}</p>
                   <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-8">
@@ -105,6 +135,7 @@ export default function MaintenancePage() {
                   <div className="flex flex-wrap gap-3">
                     <Link
                       to="/book"
+                      state={{ preselectedServiceId: s.id }}
                       className="px-6 py-3 rounded-xl font-bold text-xs sm:text-sm text-white hover:scale-105 transition-all shadow-md"
                       style={{ background: 'linear-gradient(135deg,#0A2342,#1E3A8A)' }}
                     >

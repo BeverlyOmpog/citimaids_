@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\BookingDetail;
 use App\Models\Client;
+use App\Models\Service;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
@@ -34,13 +36,36 @@ class BookingController extends Controller
     {
         $validated = $request->validate([
             'name'           => 'required|string|max:255',
-            'contact_number' => 'required|string|max:50',
+            'contact_number' => 'nullable|string|max:50',
+            'phone'          => 'nullable|string|max:50',
             'email'          => 'nullable|email|max:255',
-            'service_id'     => 'required|exists:services,id',
-            'preferred_date' => 'required|date|after_or_equal:today',
             'address'        => 'required|string',
+            'service_id'     => 'required|exists:services,id',
+            'preferred_date' => 'nullable|date',
+            'date'           => 'nullable|date',
+            'preferred_time' => 'nullable|string|max:50',
+            'time'           => 'nullable|string|max:50',
+            'rates'          => 'nullable|numeric|min:0',
+            'total_amount'   => 'nullable|numeric|min:0',
+            'status'         => 'nullable|string|in:pending,confirmed,completed,cancelled',
             'notes'          => 'nullable|string',
         ]);
+
+        $contactNumber = $validated['contact_number'] ?? $validated['phone'] ?? $request->input('phone');
+        if (empty($contactNumber)) {
+            return response()->json([
+                'message' => 'The contact number or phone is required.',
+                'errors'  => ['contact_number' => ['The phone number is required.']],
+            ], 422);
+        }
+
+        $preferredDate = $validated['preferred_date'] ?? $validated['date'] ?? $request->input('date');
+        if (empty($preferredDate)) {
+            return response()->json([
+                'message' => 'The booking date is required.',
+                'errors'  => ['preferred_date' => ['The booking date is required.']],
+            ], 422);
+        }
 
         // Ensure the selected service is currently active and available for customer booking
         $service = Service::where('id', $validated['service_id'])
@@ -54,29 +79,60 @@ class BookingController extends Controller
             ], 422);
         }
 
-        // Find or create client by contact number
-        $client = Client::firstOrCreate(
-            ['contact_number' => $validated['contact_number']],
-            [
-                'name'    => $validated['name'],
-                'email'   => $validated['email'] ?? null,
-                'address' => $validated['address'],
-            ]
-        );
+        // Create or update client record by contact number or email
+        $client = Client::where('contact_number', $contactNumber)
+            ->when(!empty($validated['email']), function ($q) use ($validated) {
+                $q->orWhere('email', $validated['email']);
+            })
+            ->first();
+
+        if ($client) {
+            $client->update([
+                'name'           => $validated['name'],
+                'contact_number' => $contactNumber,
+                'email'          => $validated['email'] ?? $client->email,
+                'address'        => $validated['address'] ?? $client->address,
+            ]);
+        } else {
+            $client = Client::create([
+                'name'           => $validated['name'],
+                'contact_number' => $contactNumber,
+                'email'          => $validated['email'] ?? null,
+                'address'        => $validated['address'],
+            ]);
+        }
+
+        $rateAmount = $validated['rates'] ?? $validated['total_amount'] ?? $service->base_price ?? 0;
+        $bookingStatus = $validated['status'] ?? 'pending';
+        $timeSlot = $validated['preferred_time'] ?? $validated['time'] ?? null;
 
         $booking = Booking::create([
             'client_id'      => $client->id,
-            'service_id'     => $validated['service_id'],
-            'preferred_date' => $validated['preferred_date'],
+            'service_id'     => $service->id,
+            'preferred_date' => $preferredDate,
+            'preferred_time' => $timeSlot,
             'address'        => $validated['address'],
             'notes'          => $validated['notes'] ?? null,
-            'status'         => 'pending',
+            'status'         => $bookingStatus,
+            'total_amount'   => $rateAmount,
+            'payment_status' => 'unpaid',
+            'payment_method' => 'Cash on Completion',
+        ]);
+
+        // Record booking detail for line-item tracking
+        BookingDetail::create([
+            'booking_id'  => $booking->id,
+            'service_id'  => $service->id,
+            'quantity'    => 1,
+            'unit_price'  => $service->base_price,
+            'total_price' => $rateAmount,
         ]);
 
         return response()->json([
             'message'    => 'Booking request submitted successfully.',
             'booking_id' => $booking->id,
             'reference'  => 'CM-' . str_pad($booking->id, 5, '0', STR_PAD_LEFT),
+            'booking'    => $booking->load(['client', 'service']),
         ], 201);
     }
 

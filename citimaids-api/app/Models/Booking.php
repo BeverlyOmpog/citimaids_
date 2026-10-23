@@ -11,6 +11,7 @@ class Booking extends Model
         'service_id',
         'processed_by_user_id',
         'preferred_date',
+        'preferred_time',
         'address',
         'notes',
         'status',

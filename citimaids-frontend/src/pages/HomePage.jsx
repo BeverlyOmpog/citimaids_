@@ -166,9 +166,8 @@ function FAQCard({ q, a, index }) {
         <div className="flex items-center justify-between p-6 gap-4">
           <span className="font-bold text-slate-900 text-base sm:text-lg">{q}</span>
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-              open ? 'bg-[#0A2342] text-white rotate-180 shadow-md' : 'bg-slate-100 text-slate-500'
-            }`}
+            className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${open ? 'bg-[#0A2342] text-white rotate-180 shadow-md' : 'bg-slate-100 text-slate-500'
+              }`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -190,11 +189,15 @@ function FAQCard({ q, a, index }) {
 export default function HomePage() {
   const { settings } = useSettings();
   const { services } = useServices();
-  
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ name: '', location: '', stars: 5, text: '' });
+
+
   // Safely extract city from the address or default to 'Abu Dhabi'
   const addressParts = settings?.business_address ? settings.business_address.split(',') : [];
   const city = addressParts.length > 1 ? addressParts[1].trim() : 'Abu Dhabi';
-  
+
   const businessName = settings?.business_name || 'CitiMaids';
   const description = settings?.description || "From luxury villas and private apartments to corporate offices across Abu Dhabi, CitiMaids delivers hospital-grade sanitization and spotless finishing tailored to your schedule.";
 
@@ -211,7 +214,7 @@ export default function HomePage() {
           ref={(el) => {
             if (el) {
               el.muted = true;
-              el.play().catch(() => {});
+              el.play().catch(() => { });
             }
           }}
           className="absolute inset-0 w-full h-full object-cover scale-105 pointer-events-none"
@@ -279,26 +282,34 @@ export default function HomePage() {
             {/* Trust Proof Badges */}
             <div className="flex flex-wrap gap-3">
               {[
-                { label: 'AED 1M Insurance', icon: (
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                )},
-                { label: 'Emirates ID Verified', icon: (
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                )},
-                { label: '4.9 / 5 Rating', icon: (
-                  <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                  </svg>
-                )},
-                { label: 'Same-Day Slots Available', icon: (
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                )},
+                {
+                  label: 'AED 1M Insurance', icon: (
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  )
+                },
+                {
+                  label: 'Emirates ID Verified', icon: (
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  )
+                },
+                {
+                  label: '4.9 / 5 Rating', icon: (
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                  )
+                },
+                {
+                  label: 'Same-Day Slots Available', icon: (
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  )
+                },
               ].map((b) => (
                 <div
                   key={b.label}
@@ -511,7 +522,7 @@ export default function HomePage() {
                         {service.description}
                       </p>
                       <ul className="space-y-2 mb-6 text-xs sm:text-sm text-slate-700">
-                        {service.included.slice(0, 3).map((inc) => (
+                        {(service.included || []).slice(0, 3).map((inc) => (
                           <li key={inc} className="flex items-start gap-2.5">
                             <span className="text-emerald-600 font-bold text-base leading-none">✓</span>
                             <span>{inc}</span>
@@ -704,9 +715,8 @@ export default function HomePage() {
                             key={star}
                             type="button"
                             onClick={() => setReviewForm({ ...reviewForm, stars: star })}
-                            className={`transition-all transform hover:scale-110 ${
-                              star <= reviewForm.stars ? 'text-amber-400' : 'text-slate-200'
-                            }`}
+                            className={`transition-all transform hover:scale-110 ${star <= reviewForm.stars ? 'text-amber-400' : 'text-slate-200'
+                              }`}
                           >
                             ★
                           </button>

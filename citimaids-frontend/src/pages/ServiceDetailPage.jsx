@@ -6,8 +6,8 @@ export default function ServiceDetailPage() {
   const { serviceId } = useParams();
   const { services, loading } = useServices();
 
-  // serviceId in the URL is the DB integer id (as a string)
-  const service = services.find((s) => String(s.id) === serviceId);
+  // serviceId in the URL may be the DB integer id or slug
+  const service = services.find((s) => String(s.id) === String(serviceId) || s.slug === serviceId);
 
   if (loading) {
     return (

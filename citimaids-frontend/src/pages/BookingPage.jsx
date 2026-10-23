@@ -227,16 +227,29 @@ export default function BookingPage() {
   const handleConfirm = async () => {
     setSubmitLoading(true);
     let bookingId = 'CM-' + Date.now().toString().slice(-5);
+    const formattedAddress = `${data.district ? data.district + ', ' : ''}${data.streetAddress}${data.city ? ', ' + data.city : ''}${data.zipCode ? ' ' + data.zipCode : ''}`.trim();
     try {
-      const res = await api.post('/bookings', {
-        name: data.name,
-        contact_number: data.phone,
-        email: data.email || null,
-        service_id: data.serviceId,   // already the DB integer id
+      const payload = {
+        // Client Details
+        name: data.name.trim(),
+        contact_number: data.phone.trim(),
+        phone: data.phone.trim(),
+        email: data.email ? data.email.trim() : null,
+        address: formattedAddress,
+
+        // Booking Details
+        service_id: data.serviceId,
         preferred_date: data.date,
-        address: `${data.district ? data.district + ', ' : ''}${data.streetAddress}${data.city ? ', ' + data.city : ''}${data.zipCode ? ' ' + data.zipCode : ''}`,
+        date: data.date,
+        preferred_time: data.time,
+        time: data.time,
+        rates: estimate.total,
+        total_amount: estimate.total,
+        status: 'pending',
         notes: `Property: ${data.propertyType}, ${data.rooms} Bed, ${data.bathrooms} Bath | Time: ${data.time} | Est: AED ${estimate.total} | Notes: ${data.notes || 'None'}`,
-      });
+      };
+
+      const res = await api.post('/bookings', payload);
       if (res.data?.reference) {
         bookingId = res.data.reference;
       } else if (res.data?.booking_id) {
