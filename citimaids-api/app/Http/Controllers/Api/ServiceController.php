@@ -9,28 +9,52 @@ use Illuminate\Support\Facades\DB;
 
 class ServiceController extends Controller
 {
+    /**
+     * Public services list (customer-facing).
+     * Always returns ONLY active services, ensuring inactive ones never show on customer booking.
+     */
     public function index(Request $request)
     {
         $query = Service::withCount('bookings')->orderBy('display_order');
 
-        // Admin (authenticated) sees all; public customers only see active
-        if (! $request->user()) {
+        // Allow authenticated admin to view all only if explicitly requesting ?all=1
+        $user = $request->user('sanctum') ?? auth('sanctum')->user();
+        if (! ($user && $request->boolean('all'))) {
             $query->where('status', 'active');
         }
 
         return response()->json($query->get());
     }
 
+    /**
+     * Admin services management endpoint.
+     * Returns all services (active and inactive) with booking stats.
+     */
+    public function adminIndex(Request $request)
+    {
+        $services = Service::withCount('bookings')
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
+            ->orderBy('display_order')
+            ->get();
+
+        return response()->json($services);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
+            'category'      => 'nullable|string|max:50',
             'description'   => 'nullable|string',
             'base_price'    => 'nullable|numeric|min:0',
             'icon'          => 'nullable|string|max:100',
             'status'        => 'in:active,inactive',
             'display_order' => 'nullable|integer|min:1',
         ]);
+
+        if (empty($validated['category'])) {
+            $validated['category'] = 'residential';
+        }
 
         // Auto-assign display_order to end if not provided
         if (empty($validated['display_order'])) {
@@ -48,6 +72,7 @@ class ServiceController extends Controller
 
         $validated = $request->validate([
             'name'          => 'sometimes|string|max:255',
+            'category'      => 'nullable|string|max:50',
             'description'   => 'nullable|string',
             'base_price'    => 'nullable|numeric|min:0',
             'icon'          => 'nullable|string|max:100',

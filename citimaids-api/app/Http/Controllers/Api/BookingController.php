@@ -42,6 +42,18 @@ class BookingController extends Controller
             'notes'          => 'nullable|string',
         ]);
 
+        // Ensure the selected service is currently active and available for customer booking
+        $service = Service::where('id', $validated['service_id'])
+            ->where('status', 'active')
+            ->first();
+
+        if (! $service) {
+            return response()->json([
+                'message' => 'The selected service is currently unavailable for booking.',
+                'errors'  => ['service_id' => ['The selected service is currently inactive.']],
+            ], 422);
+        }
+
         // Find or create client by contact number
         $client = Client::firstOrCreate(
             ['contact_number' => $validated['contact_number']],

@@ -4,16 +4,17 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        User::firstOrCreate(
+        User::updateOrCreate(
             ['email' => 'admin@citimaids.com'],
             [
                 'name'     => 'Admin',
-                'password' => 'Citimaids@admin!$123',
+                'password' => Hash::make('Citimaids@admin!$123'),
                 'role'     => 'admin',
             ]
         );
