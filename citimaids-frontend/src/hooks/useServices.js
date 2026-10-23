@@ -141,6 +141,10 @@ export function enrichService(svc) {
     ? `AED ${price} ${rateInfo.label}`
     : 'Contact for pricing';
 
+  const category = (svc.category && String(svc.category).trim())
+    ? String(svc.category).trim().toLowerCase()
+    : resolveByKeywords(svc.name, CATEGORY_MAP, 'residential');
+
   return {
     ...svc,
     title:         svc.name,
@@ -149,7 +153,7 @@ export function enrichService(svc) {
     startingPrice,
     rateUnit:      rateInfo.unit,
     iconName:      resolveByKeywords(svc.name, ICON_MAP, 'sparkles'),
-    category:      resolveByKeywords(svc.name, CATEGORY_MAP, 'specialized'),
+    category,
     image:         getImage(svc.name),
     included:      [],
     description:   svc.description || '',

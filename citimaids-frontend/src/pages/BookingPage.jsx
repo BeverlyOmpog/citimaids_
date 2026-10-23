@@ -71,28 +71,12 @@ export const uaeDistricts = {
   ],
 };
 
-const CATEGORY_TABS = [
-  { key: 'all', label: 'All Services' },
-  { key: 'residential', label: 'Residential' },
-  { key: 'commercial', label: 'Commercial' },
-  { key: 'specialized', label: 'Specialized & Deep Care' },
-  { key: 'maintenance', label: 'Outdoor Maintenance' },
-];
-
-function getCategoryBadge(category) {
-  switch (category) {
-    case 'residential':
-      return { label: 'Residential', bg: '#ecfdf5', color: '#047857' };
-    case 'commercial':
-      return { label: 'Commercial', bg: '#eff6ff', color: '#1d4ed8' };
-    case 'specialized':
-      return { label: 'Specialized', bg: '#fffbeb', color: '#b45309' };
-    case 'maintenance':
-      return { label: 'Maintenance', bg: '#ecfeff', color: '#0e7490' };
-    default:
-      return { label: 'Service', bg: '#f1f5f9', color: '#475569' };
-  }
-}
+const SERVICE_CATEGORY_TAGS = {
+  residential: { label: 'RESIDENTIAL', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+  commercial:  { label: 'COMMERCIAL',  color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  specialized: { label: 'SPECIALIZED', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+  maintenance: { label: 'MAINTENANCE', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+};
 
 export default function BookingPage() {
   const navigate = useNavigate();
@@ -103,9 +87,36 @@ export default function BookingPage() {
 
   const { services, loading: servicesLoading } = useServices();
 
-  const [step, setStep] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [expandedServiceId, setExpandedServiceId] = useState(null);
+  const [step, setStep] = useState(0);
+
+  const categoryCounts = useMemo(() => {
+    const counts = { all: services.length, residential: 0, commercial: 0, specialized: 0, maintenance: 0 };
+    services.forEach((s) => {
+      const cat = (s.category || 'residential').toLowerCase();
+      if (counts[cat] !== undefined) counts[cat]++;
+      else counts.residential++;
+    });
+    return counts;
+  }, [services]);
+
+  const categories = useMemo(() => {
+    const list = [
+      { key: 'all', label: 'All Services', count: categoryCounts.all },
+      { key: 'residential', label: 'Residential', count: categoryCounts.residential },
+      { key: 'commercial', label: 'Commercial', count: categoryCounts.commercial },
+      { key: 'specialized', label: 'Specialized & Deep Care', count: categoryCounts.specialized },
+    ];
+    if (categoryCounts.maintenance > 0) {
+      list.push({ key: 'maintenance', label: 'Outdoor & Maintenance', count: categoryCounts.maintenance });
+    }
+    return list;
+  }, [categoryCounts]);
+
+  const filteredServices = useMemo(() => {
+    if (selectedCategory === 'all') return services;
+    return services.filter((s) => (s.category || 'residential').toLowerCase() === selectedCategory);
+  }, [services, selectedCategory]);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [contactErrors, setContactErrors] = useState({});
   const [data, setData] = useState({
@@ -380,141 +391,177 @@ export default function BookingPage() {
           overflow: 'hidden',
         }}>
           {/* Step Label */}
-          <div style={{ marginBottom: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: 1.2 }}>
-              Step {step + 1}
+          <div style={{ marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+              STEP 1
             </span>
           </div>
 
           {/* ── STEP 0: Choose Service ── */}
           {step === 0 && (
             <div>
-              <h2 style={{ fontSize: 26, fontWeight: 800, color: '#0A2342', margin: '0 0 4px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              <h2 style={{ fontSize: 28, fontWeight: 800, color: '#0A2342', margin: '0 0 6px', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.3px' }}>
                 Select Your Service
               </h2>
-              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 20px' }}>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 20px', lineHeight: 1.5 }}>
                 Choose from our certified residential, commercial, and outdoor maintenance services across Abu Dhabi.
               </p>
 
               {/* Category Filter Pills */}
-              <div style={{
-                display: 'flex',
-                gap: 8,
-                overflowX: 'auto',
-                paddingBottom: 8,
-                marginBottom: 20,
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
-              }}>
-                {CATEGORY_TABS.map((tab) => {
-                  const isActive = selectedCategory === tab.key;
-                  const count = categoryCounts[tab.key] || 0;
-                  return (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setSelectedCategory(tab.key)}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: 20,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        whiteSpace: 'nowrap',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 7,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        border: isActive ? '1.5px solid #0A2342' : '1.5px solid #e2e8f0',
-                        background: isActive ? '#0A2342' : '#f8fafc',
-                        color: isActive ? '#ffffff' : '#475569',
-                        boxShadow: isActive ? '0 4px 12px rgba(10,35,66,0.15)' : 'none',
-                      }}
-                    >
-                      <span>{tab.label}</span>
-                      <span style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        padding: '1px 7px',
-                        borderRadius: 10,
-                        background: isActive ? 'rgba(255,255,255,0.22)' : '#e2e8f0',
-                        color: isActive ? '#ffffff' : '#64748b',
-                      }}>
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              {!servicesLoading && services.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 22, flexWrap: 'wrap' }}>
+                  {categories.map((cat) => {
+                    const isActive = selectedCategory === cat.key;
+                    return (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat.key)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 8,
+                          padding: '7px 14px', borderRadius: 9999,
+                          fontSize: 12, fontWeight: 700,
+                          border: isActive ? 'none' : '1.5px solid #e2e8f0',
+                          background: isActive ? '#0A2342' : '#fff',
+                          color: isActive ? '#fff' : '#475569',
+                          cursor: 'pointer', transition: 'all 0.15s',
+                          boxShadow: isActive ? '0 4px 14px rgba(10,35,66,0.18)' : 'none',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = '#f8fafc';
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = '#fff';
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                          }
+                        }}
+                      >
+                        <span>{cat.label}</span>
+                        <span style={{
+                          fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 9999,
+                          background: isActive ? 'rgba(255,255,255,0.22)' : '#f1f5f9',
+                          color: isActive ? '#fff' : '#64748b',
+                        }}>
+                          {cat.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-              {/* Service Cards */}
               {servicesLoading ? (
                 /* Skeleton loader while services fetch */
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  {[1, 2, 3, 4].map((n) => (
                     <div key={n} style={{
-                      height: 110, borderRadius: 16, background: '#f1f5f9',
+                      height: 140, borderRadius: 16, background: '#f1f5f9',
                       animation: 'pulse 1.5s ease-in-out infinite',
                     }} />
                   ))}
                   <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }`}</style>
                 </div>
-              ) : services.length === 0 ? (
+              ) : filteredServices.length === 0 ? (
                 <div style={{
-                  padding: '36px 20px', borderRadius: 14,
+                  padding: '36px 20px', borderRadius: 16,
                   background: '#f8fafc', border: '1.5px dashed #cbd5e1',
                   textAlign: 'center',
                 }}>
-                  <p style={{ color: '#0A2342', fontWeight: 700, fontSize: 15, margin: '0 0 6px' }}>No Active Services Available</p>
-                  <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Please check back later or contact customer support directly.</p>
+                  <p style={{ color: '#0A2342', fontWeight: 700, fontSize: 15, margin: '0 0 6px' }}>No services in this category</p>
+                  <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>Try selecting another category or view all services.</p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    style={{
+                      padding: '8px 16px', borderRadius: 10, border: 'none',
+                      background: '#0A2342', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer'
+                    }}
+                  >
+                    View All Services
+                  </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   {filteredServices.map((s) => {
                     const isSelected = data.serviceId === s.id;
-                    const isExpanded = expandedServiceId === s.id;
-                    const catBadge = getCategoryBadge(s.category);
-
-                    const handleCardClick = () => {
-                      // Select this service
-                      set('serviceId', s.id);
-                      // Toggle expand: if already expanded+selected, collapse; otherwise expand
-                      setExpandedServiceId(isExpanded ? null : s.id);
-                    };
+                    const catKey = (s.category || 'residential').toLowerCase();
+                    const catTag = SERVICE_CATEGORY_TAGS[catKey] || SERVICE_CATEGORY_TAGS.residential;
 
                     return (
-                      <label key={s.id} style={{
-                        display: 'flex', alignItems: 'flex-start', gap: 12,
-                        padding: '16px 16px', borderRadius: 14,
-                        border: isSelected ? '2px solid #0A2342' : '1.5px solid #e2e8f0',
-                        background: isSelected ? '#eff6ff' : '#fff',
-                        cursor: 'pointer', transition: 'all 0.2s',
-                      }}>
-                        <input
-                          type="radio" name="service" value={s.id}
-                          checked={isSelected}
-                          onChange={() => set('serviceId', s.id)}
-                          style={{ marginTop: 3, accentColor: '#0A2342' }}
-                        />
+                      <div
+                        key={s.id}
+                        onClick={() => set('serviceId', s.id)}
+                        style={{
+                          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                          padding: '16px 18px', borderRadius: 16,
+                          border: isSelected ? '2px solid #0A2342' : '1.5px solid #e2e8f0',
+                          background: isSelected ? '#fbfdff' : '#fff',
+                          cursor: 'pointer', transition: 'all 0.2s',
+                          boxShadow: isSelected ? '0 6px 20px rgba(10,35,66,0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.borderColor = '#94a3b8';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 6px 16px rgba(10,35,66,0.06)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
+                          }
+                        }}
+                      >
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 14, color: '#0A2342' }}>{s.title}</div>
-                          <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', marginTop: 2 }}>{s.startingPrice}</div>
-                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                            {s.description || 'Professional cleaning services across Abu Dhabi & UAE.'}
+                          {/* Top Row: Category Tag & Selection Indicator */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                            <span style={{
+                              fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 6,
+                              background: catTag.bg, color: catTag.color, border: `1px solid ${catTag.border}`,
+                              textTransform: 'uppercase', letterSpacing: 0.6,
+                            }}>
+                              {catTag.label}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{
+                                width: 20, height: 20, borderRadius: '50%',
+                                border: isSelected ? '6px solid #0A2342' : '2px solid #cbd5e1',
+                                background: '#fff', transition: 'all 0.15s',
+                                boxSizing: 'border-box',
+                              }} />
+                              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth="2.2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d={isSelected ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                              </svg>
+                            </div>
+                          </div>
+
+                          {/* Service Title */}
+                          <div style={{ fontWeight: 800, fontSize: 15, color: '#0A2342', marginBottom: 6, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            {s.title}
+                          </div>
+
+                          {/* Description */}
+                          <div style={{
+                            fontSize: 12, color: '#64748b', lineHeight: 1.5, marginBottom: 14,
+                            display: '-webkit-box', WebkitLineClamp: isSelected ? 4 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                          }}>
+                            {s.description || 'Complete professional residential cleaning tailored to your residence.'}
                           </div>
                         </div>
 
-                        {/* ── Rate footer ── */}
+                        {/* Footer: Starting Rate */}
                         <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          paddingTop: 10,
-                          marginTop: 8,
-                          borderTop: isSelected ? '1px solid rgba(10,35,66,0.08)' : '1px solid #f1f5f9',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          paddingTop: 12, borderTop: '1px solid #f1f5f9', marginTop: 4,
                         }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                            Starting Rate
+                          <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                            STARTING RATE
                           </span>
                           <span style={{ fontSize: 13, fontWeight: 800, color: '#2563eb' }}>
                             {s.startingPrice}
