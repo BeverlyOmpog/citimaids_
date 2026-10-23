@@ -161,20 +161,6 @@ export default function BookingPage() {
     }
   }, [services, preselectedServiceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const categoryCounts = useMemo(() => {
-    const counts = { all: services.length, residential: 0, commercial: 0, specialized: 0, maintenance: 0 };
-    services.forEach((s) => {
-      if (counts[s.category] !== undefined) counts[s.category]++;
-      else counts[s.category] = 1;
-    });
-    return counts;
-  }, [services]);
-
-  const filteredServices = useMemo(() => {
-    if (selectedCategory === 'all') return services;
-    return services.filter((s) => s.category === selectedCategory);
-  }, [services, selectedCategory]);
-
   const set = (field, value) => setData((prev) => ({ ...prev, [field]: value }));
 
   // Resolve selected service — safe even while loading
