@@ -128,7 +128,10 @@ export default function BookingPage() {
   // Once services load, pick the preselected one (or first active)
   useEffect(() => {
     if (services.length === 0) return;
-    if (data.serviceId !== null) return; // already set
+
+    // Check if the current serviceId is valid in the loaded active services
+    const currentValid = data.serviceId !== null && services.some((s) => s.id === data.serviceId || String(s.id) === String(data.serviceId));
+    if (currentValid) return; // already set to a valid active service
 
     let picked = services[0];
 
@@ -142,10 +145,10 @@ export default function BookingPage() {
       }
     }
 
-    setData((prev) => ({ ...prev, serviceId: picked.id }));
-    // Auto-expand the initially selected card
-    setExpandedServiceId(picked.id);
-  }, [services]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (picked) {
+      setData((prev) => ({ ...prev, serviceId: picked.id }));
+    }
+  }, [services, preselectedServiceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const categoryCounts = useMemo(() => {
     const counts = { all: services.length, residential: 0, commercial: 0, specialized: 0, maintenance: 0 };
@@ -456,9 +459,14 @@ export default function BookingPage() {
                   ))}
                   <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }`}</style>
                 </div>
-              ) : filteredServices.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '36px 16px', background: '#f8fafc', borderRadius: 16, border: '1px dashed #cbd5e1' }}>
-                  <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>No services currently available in this category.</p>
+              ) : services.length === 0 ? (
+                <div style={{
+                  padding: '36px 20px', borderRadius: 14,
+                  background: '#f8fafc', border: '1.5px dashed #cbd5e1',
+                  textAlign: 'center',
+                }}>
+                  <p style={{ color: '#0A2342', fontWeight: 700, fontSize: 15, margin: '0 0 6px' }}>No Active Services Available</p>
+                  <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Please check back later or contact customer support directly.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -475,89 +483,24 @@ export default function BookingPage() {
                     };
 
                     return (
-                      <div
-                        key={s.id}
-                        onClick={handleCardClick}
-                        style={{
-                          position: 'relative',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          padding: '14px 16px',
-                          borderRadius: 16,
-                          border: isSelected ? '2px solid #0A2342' : '1.5px solid #e2e8f0',
-                          background: isSelected ? '#f0f7ff' : '#ffffff',
-                          boxShadow: isSelected
-                            ? '0 6px 20px rgba(10,35,66,0.10)'
-                            : '0 1px 3px rgba(0,0,0,0.02)',
-                          cursor: 'pointer',
-                          transition: 'border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease',
-                        }}
-                      >
-                        {/* ── Always-visible header row ── */}
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                          {/* Left: badge + title */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{
-                              fontSize: 10,
-                              fontWeight: 800,
-                              textTransform: 'uppercase',
-                              letterSpacing: 0.5,
-                              padding: '2px 7px',
-                              borderRadius: 5,
-                              background: catBadge.bg,
-                              color: catBadge.color,
-                              display: 'inline-block',
-                              marginBottom: 6,
-                            }}>
-                              {catBadge.label}
-                            </span>
-                            <div style={{
-                              fontWeight: 800,
-                              fontSize: 14,
-                              color: '#0A2342',
-                              lineHeight: 1.3,
-                            }}>
-                              {s.title}
-                            </div>
-                          </div>
-
-                          {/* Right: radio + chevron */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                            <div style={{
-                              width: 18, height: 18, borderRadius: '50%',
-                              border: isSelected ? '5px solid #0A2342' : '2px solid #cbd5e1',
-                              background: '#fff',
-                              transition: 'border 0.2s',
-                            }} />
-                            {/* Chevron */}
-                            <svg
-                              width="14" height="14" viewBox="0 0 24 24" fill="none"
-                              stroke={isExpanded ? '#0A2342' : '#94a3b8'} strokeWidth="2.5"
-                              style={{
-                                transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1), stroke 0.2s',
-                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                              }}
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </div>
-
-                        {/* ── Collapsible description (CSS grid animation) ── */}
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateRows: isExpanded ? '1fr' : '0fr',
-                          transition: 'grid-template-rows 0.35s cubic-bezier(0.16,1,0.3,1)',
-                        }}>
-                          <div style={{ overflow: 'hidden' }}>
-                            <div style={{
-                              fontSize: 12,
-                              color: '#64748b',
-                              lineHeight: 1.5,
-                              paddingTop: 10,
-                            }}>
-                              {s.description}
-                            </div>
+                      <label key={s.id} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 12,
+                        padding: '16px 16px', borderRadius: 14,
+                        border: isSelected ? '2px solid #0A2342' : '1.5px solid #e2e8f0',
+                        background: isSelected ? '#eff6ff' : '#fff',
+                        cursor: 'pointer', transition: 'all 0.2s',
+                      }}>
+                        <input
+                          type="radio" name="service" value={s.id}
+                          checked={isSelected}
+                          onChange={() => set('serviceId', s.id)}
+                          style={{ marginTop: 3, accentColor: '#0A2342' }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: '#0A2342' }}>{s.title}</div>
+                          <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', marginTop: 2 }}>{s.startingPrice}</div>
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {s.description || 'Professional cleaning services across Abu Dhabi & UAE.'}
                           </div>
                         </div>
 

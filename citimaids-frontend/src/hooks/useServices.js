@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import api from '../api/axios';
 import { services as fallbackServices } from '../data/services';
 
 /**
@@ -164,26 +165,16 @@ export function useServices() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('citimaids_token');
-      const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/services`, { headers });
-
-      if (!res.ok) {
-        throw new Error(`API returned ${res.status}`);
-      }
-
-      const json = await res.json();
-      const raw = Array.isArray(json) ? json : (json?.data || []);
-      if (raw.length > 0) {
-        setServices(raw.map(enrichService));
-      } else {
-        setServices(fallbackServices);
-      }
+      // Fetch public active services from backend API
+      const res = await api.get('/services');
+      const raw = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      
+      // Always map real active services from database
+      setServices(raw.map(enrichService));
     } catch (err) {
       console.warn('useServices fetch error (using fallback):', err);
-      setError(null);
+      setError(err);
+      // Fallback only if backend API is completely unreachable
       setServices(fallbackServices);
     } finally {
       setLoading(false);

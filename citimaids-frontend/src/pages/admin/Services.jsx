@@ -84,7 +84,7 @@ export default function Services() {
     const fetchServices = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/services');
+            const res = await api.get('/admin/services');
             setServices(res.data.data || res.data || []);
         } catch (err) {
             console.error('Services fetch error:', err);
@@ -404,7 +404,9 @@ export default function Services() {
                                     }}><ServiceIcon name={svc.name} /></div>
                                     <div>
                                         <div style={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>{svc.name}</div>
-                                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>SVC-{String(svc.id).padStart(3, '0')} · Order #{svc.display_order || index + 1}</div>
+                                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                                            SVC-{String(svc.id).padStart(3, '0')} · AED {Number(svc.base_price || 0).toFixed(2)} · Order #{svc.display_order || index + 1}
+                                        </div>
                                     </div>
                                 </div>
                                 <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5, paddingRight: 12 }}>
