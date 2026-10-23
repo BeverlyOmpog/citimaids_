@@ -149,8 +149,11 @@ export default function BookingPage() {
     if (preselectedServiceId !== undefined) {
       // Try matching by numeric DB id first, then by slug fallback
       const byId   = services.find((s) => s.id === preselectedServiceId || String(s.id) === String(preselectedServiceId));
-      const bySlug = services.find((s) => s.slug === preselectedServiceId);
+      const bySlug = services.find((s) => s.slug === preselectedServiceId || s.id === preselectedServiceId);
       picked = byId || bySlug || services[0];
+      if (picked?.category) {
+        setSelectedCategory(picked.category);
+      }
     }
 
     if (picked) {
@@ -158,7 +161,19 @@ export default function BookingPage() {
     }
   }, [services, preselectedServiceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const categoryCounts = useMemo(() => {
+    const counts = { all: services.length, residential: 0, commercial: 0, specialized: 0, maintenance: 0 };
+    services.forEach((s) => {
+      if (counts[s.category] !== undefined) counts[s.category]++;
+      else counts[s.category] = 1;
+    });
+    return counts;
+  }, [services]);
 
+  const filteredServices = useMemo(() => {
+    if (selectedCategory === 'all') return services;
+    return services.filter((s) => s.category === selectedCategory);
+  }, [services, selectedCategory]);
 
   const set = (field, value) => setData((prev) => ({ ...prev, [field]: value }));
 
@@ -279,7 +294,7 @@ export default function BookingPage() {
       {/* ═══ Hero Banner ═══ */}
       <div style={{
         background: 'linear-gradient(135deg, #061429 0%, #0A2342 50%, #1E3A8A 100%)',
-        padding: '96px 24px 56px',
+        padding: 'clamp(72px, 10vw, 96px) 20px clamp(48px, 7vw, 56px)',
         textAlign: 'center',
       }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
@@ -303,30 +318,32 @@ export default function BookingPage() {
       </div>
 
       {/* ═══ Step Progress Bar ═══ */}
-      <div style={{ maxWidth: 720, margin: '-24px auto 0', padding: '0 24px', position: 'relative', zIndex: 10 }}>
+      <div style={{ maxWidth: 720, margin: '-24px auto 0', padding: '0 12px', position: 'relative', zIndex: 10 }}>
         <div style={{
-          background: '#fff', borderRadius: 20, padding: '20px 28px',
+          background: '#fff', borderRadius: 20, padding: 'clamp(14px, 3vw, 20px) clamp(12px, 4vw, 28px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 8px 32px rgba(10,35,66,0.08)',
           border: '1px solid #e2e8f0',
           gap: 0,
+          overflow: 'hidden',
         }}>
           {STEPS.map((s, i) => {
             const isDone = i < step;
             const isCurrent = i === step;
             return (
-              <div key={s.key} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 'none' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 56 }}>
+              <div key={s.key} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 'none', minWidth: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, width: 'clamp(40px, 10vw, 56px)' }}>
                   <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
+                    width: 'clamp(28px, 6vw, 36px)', height: 'clamp(28px, 6vw, 36px)', borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
                     background: isDone ? '#0A2342' : isCurrent ? '#0A2342' : '#e2e8f0',
                     color: isDone || isCurrent ? '#fff' : '#94a3b8',
                     transition: 'all 0.3s',
                     boxShadow: isCurrent ? '0 4px 12px rgba(10,35,66,0.25)' : 'none',
                   }}>
                     {isDone ? (
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
@@ -334,17 +351,22 @@ export default function BookingPage() {
                     )}
                   </div>
                   <span style={{
-                    fontSize: 10, fontWeight: 700, marginTop: 6, textAlign: 'center',
+                    fontSize: 'clamp(8px, 1.8vw, 10px)', fontWeight: 700, marginTop: 4, textAlign: 'center',
                     color: isDone ? '#0A2342' : isCurrent ? '#0A2342' : '#94a3b8',
                     letterSpacing: 0.2,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '100%',
                   }}>{s.label}</span>
                 </div>
                 {i < STEPS.length - 1 && (
                   <div style={{
-                    flex: 1, height: 2, margin: '0 6px',
+                    flex: 1, height: 2, margin: '0 3px',
                     background: isDone ? '#0A2342' : '#e2e8f0',
                     borderRadius: 1, transition: 'background 0.3s',
                     marginBottom: 20,
+                    minWidth: 4,
                   }} />
                 )}
               </div>
@@ -355,15 +377,18 @@ export default function BookingPage() {
 
       {/* ═══ Main Content (Form + Order Reflection Sidebar) ═══ */}
       <div className="booking-grid" style={{
-        maxWidth: 1080, margin: '32px auto 64px', padding: '0 24px',
+        maxWidth: 1080, margin: '32px auto 64px', padding: '0 clamp(12px, 4vw, 24px)',
         display: 'grid', gap: 28,
         alignItems: 'start',
+        width: '100%',
       }}>
         {/* ── Left: Form Card ── */}
         <div style={{
-          background: '#fff', borderRadius: 20, padding: '36px 32px',
+          background: '#fff', borderRadius: 20, padding: 'clamp(20px, 5vw, 36px) clamp(16px, 5vw, 32px)',
           border: '1px solid #e2e8f0',
           boxShadow: '0 4px 24px rgba(10,35,66,0.04)',
+          minWidth: 0,
+          overflow: 'hidden',
         }}>
           {/* Step Label */}
           <div style={{ marginBottom: 6 }}>
@@ -904,7 +929,7 @@ export default function BookingPage() {
         </div>
 
         {/* ── Right: Order Reflection Sidebar ── */}
-        <div style={{ position: 'sticky', top: 100 }}>
+        <div style={{ position: 'sticky', top: 100, minWidth: 0 }}>
           <div style={{
             background: '#fff', borderRadius: 20, overflow: 'hidden',
             border: '1px solid #e2e8f0',
@@ -1011,6 +1036,11 @@ export default function BookingPage() {
         @media (max-width: 860px) {
           .booking-grid {
             grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .booking-grid {
+            padding: 0 12px !important;
           }
         }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }

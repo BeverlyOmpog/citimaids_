@@ -1,0 +1,76 @@
+---
+sidebar_position: 1
+---
+
+# CitiMaids Platform
+
+Welcome to the **CitiMaids** developer documentation — your complete reference for the CitiMaids professional cleaning services platform based in Abu Dhabi, UAE.
+
+## What Is CitiMaids?
+
+CitiMaids is a full-stack web platform powering a premium cleaning service business. It consists of two sub-applications working together:
+
+| Sub-project | Tech | Purpose |
+|---|---|---|
+| `citimaids-api` | Laravel 13 + Sanctum | RESTful JSON API — bookings, payments, admin |
+| `citimaids-frontend` | React 19 + Vite + TailwindCSS | Customer portal & staff admin panel |
+
+---
+
+## Key Features
+
+- 🧹 **16 cleaning & maintenance services** across 4 categories (Residential, Commercial, Specialized, Outdoor)
+- 📅 **Customer booking system** with WhatsApp dispatch integration
+- 🔍 **Booking tracker** — customers track their booking by reference number
+- 💳 **Payment management** — create payment links, track statuses, issue refunds
+- 📊 **Admin dashboard** with live revenue, booking, and client analytics
+- 🔒 **Role-based auth** via Laravel Sanctum (admin / staff)
+- 🎥 **Hero video background** sourced from real CitiMaids TikTok content
+- 📱 **Fully responsive** — mobile-first design
+
+---
+
+## Navigate the Docs
+
+<div className="row">
+  <div className="col col--6">
+
+### 🚀 [Getting Started](/docs/getting-started/introduction)
+New to the project? Start here. Installation, environment setup, and project structure.
+
+  </div>
+  <div className="col col--6">
+
+### ⚙️ [Backend API](/docs/backend/overview)
+Laravel API internals, database schema, and full API endpoint reference.
+
+  </div>
+</div>
+
+<div className="row">
+  <div className="col col--6">
+
+### 🎨 [Frontend](/docs/frontend/overview)
+React application architecture, pages, components, and hooks.
+
+  </div>
+  <div className="col col--6">
+
+### 🚢 [Deployment](/docs/deployment/api-deploy)
+Production deployment guides for both the API and the frontend.
+
+  </div>
+</div>
+
+---
+
+## Architecture Overview
+
+```
+citimaids_/
+├── citimaids-api/        ← Laravel 13 REST API (port 8000)
+├── citimaids-frontend/   ← React 19 SPA (port 5173)
+└── docs-site/            ← This Docusaurus site
+```
+
+The frontend communicates with the API exclusively over HTTP (Axios). Public customers use the customer portal; staff/admin log in at `/admin/login` to access the protected dashboard.
