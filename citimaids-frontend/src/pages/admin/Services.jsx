@@ -138,12 +138,17 @@ export default function Services() {
             }
             setFormModal(null);
             fetchServices();
-        } catch {
-            showToast('Failed to save service.', 'error');
+        } catch (err) {
+            console.error('Save service error:', err?.response?.status, err?.response?.data);
+            const msg = err?.response?.data?.message || err?.response?.data?.errors
+                ? 'Validation error: ' + Object.values(err.response.data.errors || {}).flat().join(', ')
+                : 'Failed to save service.';
+            showToast(msg, 'error');
         } finally {
             setFormLoading(false);
         }
     };
+
 
     const handleToggle = async (svc) => {
         const newStatus = svc.status === 'active' ? 'inactive' : 'active';
