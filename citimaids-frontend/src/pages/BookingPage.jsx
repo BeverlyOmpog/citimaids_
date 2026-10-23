@@ -71,6 +71,29 @@ export const uaeDistricts = {
   ],
 };
 
+const CATEGORY_TABS = [
+  { key: 'all', label: 'All Services' },
+  { key: 'residential', label: 'Residential' },
+  { key: 'commercial', label: 'Commercial' },
+  { key: 'specialized', label: 'Specialized & Deep Care' },
+  { key: 'maintenance', label: 'Outdoor Maintenance' },
+];
+
+function getCategoryBadge(category) {
+  switch (category) {
+    case 'residential':
+      return { label: 'Residential', bg: '#ecfdf5', color: '#047857' };
+    case 'commercial':
+      return { label: 'Commercial', bg: '#eff6ff', color: '#1d4ed8' };
+    case 'specialized':
+      return { label: 'Specialized', bg: '#fffbeb', color: '#b45309' };
+    case 'maintenance':
+      return { label: 'Maintenance', bg: '#ecfeff', color: '#0e7490' };
+    default:
+      return { label: 'Service', bg: '#f1f5f9', color: '#475569' };
+  }
+}
+
 export default function BookingPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,6 +104,8 @@ export default function BookingPage() {
   const { services, loading: servicesLoading } = useServices();
 
   const [step, setStep] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [expandedServiceId, setExpandedServiceId] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [contactErrors, setContactErrors] = useState({});
   const [data, setData] = useState({
@@ -113,8 +138,11 @@ export default function BookingPage() {
     if (preselectedServiceId !== undefined) {
       // Try matching by numeric DB id first, then by slug fallback
       const byId   = services.find((s) => s.id === preselectedServiceId || String(s.id) === String(preselectedServiceId));
-      const bySlug = services.find((s) => s.slug === preselectedServiceId);
+      const bySlug = services.find((s) => s.slug === preselectedServiceId || s.id === preselectedServiceId);
       picked = byId || bySlug || services[0];
+      if (picked?.category) {
+        setSelectedCategory(picked.category);
+      }
     }
 
     if (picked) {
@@ -122,7 +150,19 @@ export default function BookingPage() {
     }
   }, [services, preselectedServiceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const categoryCounts = useMemo(() => {
+    const counts = { all: services.length, residential: 0, commercial: 0, specialized: 0, maintenance: 0 };
+    services.forEach((s) => {
+      if (counts[s.category] !== undefined) counts[s.category]++;
+      else counts[s.category] = 1;
+    });
+    return counts;
+  }, [services]);
 
+  const filteredServices = useMemo(() => {
+    if (selectedCategory === 'all') return services;
+    return services.filter((s) => s.category === selectedCategory);
+  }, [services, selectedCategory]);
 
   const set = (field, value) => setData((prev) => ({ ...prev, [field]: value }));
 
@@ -243,7 +283,7 @@ export default function BookingPage() {
       {/* ═══ Hero Banner ═══ */}
       <div style={{
         background: 'linear-gradient(135deg, #061429 0%, #0A2342 50%, #1E3A8A 100%)',
-        padding: '96px 24px 56px',
+        padding: 'clamp(72px, 10vw, 96px) 20px clamp(48px, 7vw, 56px)',
         textAlign: 'center',
       }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
@@ -267,30 +307,32 @@ export default function BookingPage() {
       </div>
 
       {/* ═══ Step Progress Bar ═══ */}
-      <div style={{ maxWidth: 720, margin: '-24px auto 0', padding: '0 24px', position: 'relative', zIndex: 10 }}>
+      <div style={{ maxWidth: 720, margin: '-24px auto 0', padding: '0 12px', position: 'relative', zIndex: 10 }}>
         <div style={{
-          background: '#fff', borderRadius: 20, padding: '20px 28px',
+          background: '#fff', borderRadius: 20, padding: 'clamp(14px, 3vw, 20px) clamp(12px, 4vw, 28px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 8px 32px rgba(10,35,66,0.08)',
           border: '1px solid #e2e8f0',
           gap: 0,
+          overflow: 'hidden',
         }}>
           {STEPS.map((s, i) => {
             const isDone = i < step;
             const isCurrent = i === step;
             return (
-              <div key={s.key} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 'none' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 56 }}>
+              <div key={s.key} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 'none', minWidth: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, width: 'clamp(40px, 10vw, 56px)' }}>
                   <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
+                    width: 'clamp(28px, 6vw, 36px)', height: 'clamp(28px, 6vw, 36px)', borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
                     background: isDone ? '#0A2342' : isCurrent ? '#0A2342' : '#e2e8f0',
                     color: isDone || isCurrent ? '#fff' : '#94a3b8',
                     transition: 'all 0.3s',
                     boxShadow: isCurrent ? '0 4px 12px rgba(10,35,66,0.25)' : 'none',
                   }}>
                     {isDone ? (
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
@@ -298,17 +340,22 @@ export default function BookingPage() {
                     )}
                   </div>
                   <span style={{
-                    fontSize: 10, fontWeight: 700, marginTop: 6, textAlign: 'center',
+                    fontSize: 'clamp(8px, 1.8vw, 10px)', fontWeight: 700, marginTop: 4, textAlign: 'center',
                     color: isDone ? '#0A2342' : isCurrent ? '#0A2342' : '#94a3b8',
                     letterSpacing: 0.2,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '100%',
                   }}>{s.label}</span>
                 </div>
                 {i < STEPS.length - 1 && (
                   <div style={{
-                    flex: 1, height: 2, margin: '0 6px',
+                    flex: 1, height: 2, margin: '0 3px',
                     background: isDone ? '#0A2342' : '#e2e8f0',
                     borderRadius: 1, transition: 'background 0.3s',
                     marginBottom: 20,
+                    minWidth: 4,
                   }} />
                 )}
               </div>
@@ -319,15 +366,18 @@ export default function BookingPage() {
 
       {/* ═══ Main Content (Form + Order Reflection Sidebar) ═══ */}
       <div className="booking-grid" style={{
-        maxWidth: 1080, margin: '32px auto 64px', padding: '0 24px',
+        maxWidth: 1080, margin: '32px auto 64px', padding: '0 clamp(12px, 4vw, 24px)',
         display: 'grid', gap: 28,
         alignItems: 'start',
+        width: '100%',
       }}>
         {/* ── Left: Form Card ── */}
         <div style={{
-          background: '#fff', borderRadius: 20, padding: '36px 32px',
+          background: '#fff', borderRadius: 20, padding: 'clamp(20px, 5vw, 36px) clamp(16px, 5vw, 32px)',
           border: '1px solid #e2e8f0',
           boxShadow: '0 4px 24px rgba(10,35,66,0.04)',
+          minWidth: 0,
+          overflow: 'hidden',
         }}>
           {/* Step Label */}
           <div style={{ marginBottom: 8 }}>
@@ -340,18 +390,70 @@ export default function BookingPage() {
           {step === 0 && (
             <div>
               <h2 style={{ fontSize: 26, fontWeight: 800, color: '#0A2342', margin: '0 0 4px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                What do you need cleaned?
+                Select Your Service
               </h2>
-              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 24px' }}>
-                Select the service that best fits your property.
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 20px' }}>
+                Choose from our certified residential, commercial, and outdoor maintenance services across Abu Dhabi.
               </p>
 
+              {/* Category Filter Pills */}
+              <div style={{
+                display: 'flex',
+                gap: 8,
+                overflowX: 'auto',
+                paddingBottom: 8,
+                marginBottom: 20,
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}>
+                {CATEGORY_TABS.map((tab) => {
+                  const isActive = selectedCategory === tab.key;
+                  const count = categoryCounts[tab.key] || 0;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setSelectedCategory(tab.key)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        border: isActive ? '1.5px solid #0A2342' : '1.5px solid #e2e8f0',
+                        background: isActive ? '#0A2342' : '#f8fafc',
+                        color: isActive ? '#ffffff' : '#475569',
+                        boxShadow: isActive ? '0 4px 12px rgba(10,35,66,0.15)' : 'none',
+                      }}
+                    >
+                      <span>{tab.label}</span>
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        padding: '1px 7px',
+                        borderRadius: 10,
+                        background: isActive ? 'rgba(255,255,255,0.22)' : '#e2e8f0',
+                        color: isActive ? '#ffffff' : '#64748b',
+                      }}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Service Cards */}
               {servicesLoading ? (
                 /* Skeleton loader while services fetch */
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  {[1, 2, 3, 4].map((n) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
                     <div key={n} style={{
-                      height: 76, borderRadius: 14, background: '#f1f5f9',
+                      height: 110, borderRadius: 16, background: '#f1f5f9',
                       animation: 'pulse 1.5s ease-in-out infinite',
                     }} />
                   ))}
@@ -367,9 +469,19 @@ export default function BookingPage() {
                   <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Please check back later or contact customer support directly.</p>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  {services.map((s) => {
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {filteredServices.map((s) => {
                     const isSelected = data.serviceId === s.id;
+                    const isExpanded = expandedServiceId === s.id;
+                    const catBadge = getCategoryBadge(s.category);
+
+                    const handleCardClick = () => {
+                      // Select this service
+                      set('serviceId', s.id);
+                      // Toggle expand: if already expanded+selected, collapse; otherwise expand
+                      setExpandedServiceId(isExpanded ? null : s.id);
+                    };
+
                     return (
                       <label key={s.id} style={{
                         display: 'flex', alignItems: 'flex-start', gap: 12,
@@ -391,7 +503,24 @@ export default function BookingPage() {
                             {s.description || 'Professional cleaning services across Abu Dhabi & UAE.'}
                           </div>
                         </div>
-                      </label>
+
+                        {/* ── Rate footer ── */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingTop: 10,
+                          marginTop: 8,
+                          borderTop: isSelected ? '1px solid rgba(10,35,66,0.08)' : '1px solid #f1f5f9',
+                        }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                            Starting Rate
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: '#2563eb' }}>
+                            {s.startingPrice}
+                          </span>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -753,7 +882,7 @@ export default function BookingPage() {
         </div>
 
         {/* ── Right: Order Reflection Sidebar ── */}
-        <div style={{ position: 'sticky', top: 100 }}>
+        <div style={{ position: 'sticky', top: 100, minWidth: 0 }}>
           <div style={{
             background: '#fff', borderRadius: 20, overflow: 'hidden',
             border: '1px solid #e2e8f0',
@@ -860,6 +989,11 @@ export default function BookingPage() {
         @media (max-width: 860px) {
           .booking-grid {
             grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .booking-grid {
+            padding: 0 12px !important;
           }
         }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
